@@ -11,7 +11,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (config('database.default') === 'sqlite') {
+            $dbPath = config('database.connections.sqlite.database');
+            if ($dbPath && !file_exists($dbPath) && $dbPath !== ':memory:') {
+                $dir = dirname($dbPath);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0755, true);
+                }
+                touch($dbPath);
+            }
+        }
     }
 
     /**
