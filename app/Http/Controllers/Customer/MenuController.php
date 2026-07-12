@@ -92,12 +92,18 @@ class MenuController extends Controller
                         );
                     }
 
+                    // Delete all local products that do not have a firestore_id
+                    Product::whereNull('firestore_id')->delete();
+
                     // Delete local products that were deleted in Firestore
                     if (!empty($firestoreIds)) {
                         Product::whereNotNull('firestore_id')
                             ->whereNotIn('firestore_id', $firestoreIds)
                             ->delete();
                     }
+
+                    // Delete empty categories that do not have any products
+                    Category::doesntHave('products')->delete();
                 }
             } catch (\Throwable $e) {
                 // Fail silently
