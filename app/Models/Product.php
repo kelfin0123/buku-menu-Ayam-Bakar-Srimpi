@@ -21,6 +21,7 @@ class Product extends Model
         'is_promo',
         'is_active',
         'sort_order',
+        'firestore_id',
     ];
 
     protected $casts = [
@@ -46,6 +47,10 @@ class Product extends Model
     /** Path gambar publik dengan fallback placeholder */
     public function getImageUrlAttribute(): string
     {
+        if ($this->image && (str_starts_with($this->image, 'http://') || str_starts_with($this->image, 'https://'))) {
+            return $this->image;
+        }
+
         return $this->image
             ? asset('images/products/' . $this->image)
             : asset('images/products/placeholder.jpg');
