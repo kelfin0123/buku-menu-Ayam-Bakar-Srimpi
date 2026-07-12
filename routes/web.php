@@ -27,3 +27,15 @@ Route::prefix('checkout')->name('checkout.')->group(function () {
 });
 
 Route::get('/order/{orderCode}', [OrderController::class, 'show'])->name('order.show');
+
+Route::get('/produk', function () {
+    return response()->json(
+        \App\Models\Product::active()->get()->map(function ($product) {
+            return [
+                'id' => intval($product->id),
+                'nama' => $product->name,
+                'harga' => intval($product->price),
+            ];
+        })
+    );
+});
