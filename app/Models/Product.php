@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -51,9 +52,13 @@ class Product extends Model
             return $this->image;
         }
 
-        return $this->image
-            ? asset('images/products/' . $this->image)
-            : asset('images/products/placeholder.jpg');
+        if ($this->image) {
+            // Ensure the public disk URL is a full URL
+            return url(Storage::url($this->image));
+        }
+
+        // Fallback to existing public placeholder (kept for backward compatibility)
+        return asset('images/products/placeholder.jpg');
     }
 
     public function scopeActive($query)
