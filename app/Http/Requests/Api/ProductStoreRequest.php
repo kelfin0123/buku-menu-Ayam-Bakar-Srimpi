@@ -3,14 +3,12 @@
 namespace App\Http\Requests\Api;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Gate;
 
 class ProductStoreRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Ensure the user is authenticated and authorized to create products
-        return auth()->check();
+        return true;
     }
 
     public function rules(): array
@@ -18,9 +16,13 @@ class ProductStoreRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'price' => ['required', 'integer', 'min:0'],
-            'category_id' => ['required', 'exists:categories,id'],
+            'category_id' => ['nullable', 'exists:categories,id'],
+            'category' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'], // max in KB
+            'firestore_id' => ['nullable', 'string', 'max:255'],
+            'image' => $this->hasFile('image')
+                ? ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120']
+                : ['nullable', 'url', 'max:2048'],
         ];
     }
 }

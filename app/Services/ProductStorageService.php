@@ -14,8 +14,7 @@ class ProductStorageService
     public function ensureStorageLink(): void
     {
         $publicStorage = public_path('storage');
-        if (!file_exists($publicStorage)) {
-            // create storage link using artisan command
+        if (! file_exists($publicStorage)) {
             try {
                 \Artisan::call('storage:link');
             } catch (\Throwable $e) {
@@ -24,15 +23,19 @@ class ProductStorageService
         }
     }
 
-    public function store(UploadedFile $file): string
+    public function store(UploadedFile $file): array
     {
         $this->ensureStorageLink();
 
-        $ext = $file->getClientOriginalExtension();
+        $ext = $file->getClientOriginalExtension() ?: 'jpg';
         $filename = Str::uuid()->toString() . '.' . $ext;
+        Storage::disk($this->disk)->makeDirectory($this->directory);
         $path = $file->storeAs($this->directory, $filename, $this->disk);
 
-        return $path; // e.g. products/uuid.jpg
+        return [
+            'path' => $path,
+            'url' => url(Storage::disk($this->disk)->url($path)),
+        ];
     }
 
     public function delete(?string $path): void
@@ -41,6 +44,28 @@ class ProductStorageService
             return;
         }
 
-        Storage::disk($this->disk)->delete($path);
+        $relativePath = $this->toStoragePath($path);
+        if (! $relativePath) {
+            return;
+        }
+
+        Storage::disk($this->disk)->delete($relativePath);
+    }
+
+    public function toStoragePath(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            $parsed = parse_url($path);
+            $path = $parsed['path'] ?? '';
+        }
+
+        $path = ltrim($path, '/');
+        $path = str_replace('storage/', '', $path, $count);
+
+        return $count > 0 ? $path : $path;
     }
 }

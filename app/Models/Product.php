@@ -53,12 +53,10 @@ class Product extends Model
         }
 
         if ($this->image) {
-            // Ensure the public disk URL is a full URL
             return url(Storage::url($this->image));
         }
 
-        // Fallback to existing public placeholder (kept for backward compatibility)
-        return asset('images/products/placeholder.jpg');
+        return asset('images/no-image.png');
     }
 
     public function scopeActive($query)

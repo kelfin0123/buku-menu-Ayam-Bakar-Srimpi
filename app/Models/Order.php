@@ -16,6 +16,7 @@ class Order extends Model
         'customer_name',
         'customer_phone',
         'customer_address',
+        'table_number',
         'subtotal',
         'shipping_cost',
         'total',
@@ -24,6 +25,17 @@ class Order extends Model
         'midtrans_snap_token',
         'midtrans_order_id',
         'status',
+        'employee_id',
+        'accepted_at',
+        'finished_at',
+        'rejected_at',
+        'rejection_reason',
+    ];
+
+    protected $casts = [
+        'accepted_at' => 'datetime',
+        'finished_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function items(): HasMany

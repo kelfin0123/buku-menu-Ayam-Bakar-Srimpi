@@ -8,7 +8,7 @@ class ProductUpdateRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return true;
     }
 
     public function rules(): array
@@ -16,9 +16,13 @@ class ProductUpdateRequest extends FormRequest
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'price' => ['sometimes', 'required', 'integer', 'min:0'],
-            'category_id' => ['sometimes', 'required', 'exists:categories,id'],
+            'category_id' => ['nullable', 'exists:categories,id'],
+            'category' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'firestore_id' => ['nullable', 'string', 'max:255'],
+            'image' => $this->hasFile('image')
+                ? ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120']
+                : ['nullable', 'url', 'max:2048'],
         ];
     }
 }
