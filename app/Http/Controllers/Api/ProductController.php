@@ -168,11 +168,11 @@ class ProductController extends Controller
     {
         $request->validate([
             'product_ids' => 'required|array',
-            'product_ids.*' => 'integer',
+            'product_ids.*' => 'string',
         ]);
 
         $requestedIds = $request->input('product_ids');
-        $existingIds = Product::whereIn('id', $requestedIds)->pluck('id')->toArray();
+        $existingIds = Product::whereIn('firestore_id', $requestedIds)->pluck('firestore_id')->toArray();
 
         return response()->json([
             'valid' => count($requestedIds) === count($existingIds),

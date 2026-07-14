@@ -21,7 +21,7 @@ class CheckoutController extends Controller
             'table_number' => 'required|string|max:10',
             'payment_method' => 'required|in:cash,qris',
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => 'required|exists:products,firestore_id',
             'items.*.qty' => 'required|integer|min:1',
         ]);
 
@@ -30,7 +30,7 @@ class CheckoutController extends Controller
         $itemsData = [];
 
         foreach ($validated['items'] as $item) {
-            $product = Product::findOrFail($item['product_id']);
+            $product = Product::where('firestore_id', $item['product_id'])->firstOrFail();
             $lineTotal = $product->final_price * $item['qty'];
             $subtotal += $lineTotal;
 
