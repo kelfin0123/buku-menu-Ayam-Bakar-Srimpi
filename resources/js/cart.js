@@ -230,7 +230,7 @@ export function initCart() {
         if (!btn) return;
 
         addToCart({
-            id: parseInt(btn.dataset.id, 10),
+            id: btn.dataset.id,  // Firestore ID is a string, don't convert to integer
             name: btn.dataset.name,
             price: parseInt(btn.dataset.price, 10),
             image: btn.dataset.image,

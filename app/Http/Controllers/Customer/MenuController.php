@@ -16,7 +16,8 @@ class MenuController extends Controller
      */
     public function index(Request $request): View
     {
-        $this->syncFromFirestore();
+        // Sync from Firebase is now handled by background scheduler
+        // No need to sync on every page load
 
         $categories = Category::query()
             ->active()
@@ -31,87 +32,6 @@ class MenuController extends Controller
             'activeCategory'  => $request->get('category', 'semua'),
             'searchTerm'      => $request->get('search', ''),
         ]);
-    }
-
-    /**
-     * Sync products and categories from Firestore REST API.
-     */
-    private function syncFromFirestore(): void
-    {
-        \Illuminate\Support\Facades\Cache::remember('firestore_products_sync', 300, function () {
-            try {
-                $response = \Illuminate\Support\Facades\Http::timeout(5)
-                    ->get('https://firestore.googleapis.com/v1/projects/kasir-40363/databases/(default)/documents/products');
-
-                if ($response->successful()) {
-                    $data = $response->json();
-                    $documents = $data['documents'] ?? [];
-                    $firestoreIds = [];
-
-                    foreach ($documents as $doc) {
-                        $namePath = $doc['name'] ?? '';
-                        $parts = explode('/', $namePath);
-                        $firestoreId = end($parts);
-                        if (!$firestoreId) {
-                            continue;
-                        }
-
-                        $firestoreIds[] = $firestoreId;
-                        $fields = $doc['fields'] ?? [];
-
-                        $name = $fields['name']['stringValue'] ?? '';
-                        $price = $fields['price']['doubleValue'] ?? $fields['price']['integerValue'] ?? 0;
-                        $categoryName = $fields['category']['stringValue'] ?? 'Umum';
-                        $description = $fields['description']['stringValue'] ?? '';
-                        $imageUrl = $fields['imageUrl']['stringValue'] ?? null;
-                        $isActive = $fields['isActive']['booleanValue'] ?? true;
-
-                        // Get or create Category
-                        $category = Category::firstOrCreate(
-                            ['name' => $categoryName],
-                            [
-                                'slug' => \Illuminate\Support\Str::slug($categoryName),
-                                'is_active' => true,
-                                'sort_order' => 1
-                            ]
-                        );
-
-                        // Update or create Product
-                        Product::updateOrCreate(
-                            ['firestore_id' => $firestoreId],
-                            [
-                                'category_id' => $category->id,
-                                'name' => $name,
-                                'slug' => \Illuminate\Support\Str::slug($name) . '-' . $firestoreId,
-                                'description' => $description,
-                                'price' => intval($price),
-                                'image' => $imageUrl,
-                                'is_active' => $isActive,
-                                'sort_order' => 1
-                            ]
-                        );
-                    }
-
-                    // Delete all local products that do not have a firestore_id
-                    Product::whereNull('firestore_id')->delete();
-
-                    // Delete local products that were deleted in Firestore
-                    if (!empty($firestoreIds)) {
-                        Product::whereNotNull('firestore_id')
-                            ->whereNotIn('firestore_id', $firestoreIds)
-                            ->delete();
-                    }
-
-                    // Delete empty categories that do not have any products
-                    Category::doesntHave('products')->delete();
-                }
-            } catch (\Throwable $e) {
-                // Fail silently
-                logger('Firestore sync failed: ' . $e->getMessage());
-            }
-
-            return true;
-        });
     }
 
     /**

@@ -64,49 +64,68 @@
         </form>
     </section>
 
-    <script type="module">
-        import { getCart, validateCart, clearCart } from '/resources/js/cart.js';
+    <script>
+        // Direct inline script - no module imports
+        const CART_KEY = 'ayam_bakar_srimpi_cart';
 
-        // Load cart data and populate hidden inputs as array
-        document.addEventListener('DOMContentLoaded', async function() {
-            const cart = getCart();
-            const itemsContainer = document.getElementById('checkoutItemsContainer');
-            
-            if (cart.length === 0) {
-                document.getElementById('checkoutSummary').innerHTML = '<p class="empty-cart">Keranjang kosong</p>';
-                document.querySelector('.cart-checkout-btn').disabled = true;
-                return;
+        function getCart() {
+            try {
+                return JSON.parse(localStorage.getItem(CART_KEY)) || [];
+            } catch (e) {
+                return [];
             }
-            
-            // Validate cart using shared function
-            const validatedCart = await validateCart();
-            
-            if (validatedCart.length === 0) {
-                document.getElementById('checkoutSummary').innerHTML = '<p class="empty-cart">Keranjang kosong. Beberapa produk tidak tersedia lagi.</p>';
-                document.querySelector('.cart-checkout-btn').disabled = true;
-                return;
+        }
+
+        function formatRupiah(number) {
+            return 'Rp ' + Number(number).toLocaleString('id-ID');
+        }
+
+        async function validateCart(cart) {
+            if (cart.length === 0) return cart;
+
+            try {
+                const productIds = cart.map(item => item.id);
+                const response = await fetch('/api/products/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ product_ids: productIds })
+                });
+
+                const result = await response.json();
+
+                if (!result.valid && result.invalid_ids && result.invalid_ids.length > 0) {
+                    // Remove invalid products from cart
+                    const validCart = cart.filter(item => result.valid_ids.includes(item.id));
+                    localStorage.setItem(CART_KEY, JSON.stringify(validCart));
+
+                    // Show notification to user
+                    const invalidCount = result.invalid_ids.length;
+                    if (invalidCount > 0) {
+                        alert(`${invalidCount} produk di keranjang tidak tersedia lagi dan telah dihapus dari keranjang.`);
+                    }
+
+                    return validCart;
+                }
+
+                return cart;
+            } catch (error) {
+                console.error('Error validating cart:', error);
+                return cart; // Return original cart if validation fails
             }
-            
-            // Create hidden inputs for each item using array notation
-            let inputsHtml = '';
-            validatedCart.forEach((item, index) => {
-                inputsHtml += `
-                    <input type="hidden" name="items[${index}][product_id]" value="${item.id}">
-                    <input type="hidden" name="items[${index}][qty]" value="${item.qty}">
-                `;
-            });
-            itemsContainer.innerHTML = inputsHtml;
-            
-            // Render summary
-            renderCheckoutSummary(validatedCart);
-        });
+        }
 
         function renderCheckoutSummary(cart) {
             const summaryContainer = document.getElementById('checkoutSummary');
+            if (!summaryContainer) return;
+
             const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-            
+
             let html = '<div class="checkout-items">';
-            
+
             cart.forEach(item => {
                 html += `
                     <div class="checkout-item">
@@ -118,9 +137,9 @@
                     </div>
                 `;
             });
-            
+
             html += '</div>';
-            
+
             html += `
                 <div class="checkout-total">
                     <div class="checkout-total-row">
@@ -133,13 +152,55 @@
                     </div>
                 </div>
             `;
-            
+
             summaryContainer.innerHTML = html;
         }
 
-        function formatRupiah(number) {
-            return 'Rp ' + Number(number).toLocaleString('id-ID');
-        }
+        document.addEventListener('DOMContentLoaded', async function() {
+            const cart = getCart();
+            const itemsContainer = document.getElementById('checkoutItemsContainer');
+            const summaryContainer = document.getElementById('checkoutSummary');
+            const checkoutBtn = document.querySelector('.cart-checkout-btn');
+
+            if (cart.length === 0) {
+                if (summaryContainer) {
+                    summaryContainer.innerHTML = '<p class="empty-cart">Keranjang kosong</p>';
+                }
+                if (checkoutBtn) {
+                    checkoutBtn.disabled = true;
+                }
+                return;
+            }
+
+            // Validate cart against database
+            const validatedCart = await validateCart(cart);
+
+            if (validatedCart.length === 0) {
+                if (summaryContainer) {
+                    summaryContainer.innerHTML = '<p class="empty-cart">Keranjang kosong. Beberapa produk tidak tersedia lagi.</p>';
+                }
+                if (checkoutBtn) {
+                    checkoutBtn.disabled = true;
+                }
+                return;
+            }
+
+            // Create hidden inputs for each item using array notation
+            let inputsHtml = '';
+            validatedCart.forEach((item, index) => {
+                inputsHtml += `
+                    <input type="hidden" name="items[${index}][product_id]" value="${item.id}">
+                    <input type="hidden" name="items[${index}][qty]" value="${item.qty}">
+                `;
+            });
+
+            if (itemsContainer) {
+                itemsContainer.innerHTML = inputsHtml;
+            }
+
+            // Render summary
+            renderCheckoutSummary(validatedCart);
+        });
     </script>
 
     <style>
