@@ -26,6 +26,8 @@
                     data-name="{{ $product->name }}"
                     data-price="{{ $product->final_price }}"
                     data-image="{{ $product->image_url }}"
+                    data-debug-id="{{ $product->id }}"
+                    data-debug-firestore="{{ $product->firestore_id }}"
                     aria-label="Tambah {{ $product->name }} ke keranjang">
                 @include('components.icons.plus')
             </button>

@@ -111,16 +111,30 @@ function formatRupiah(number) {
 }
 
 function addToCart(product) {
+    console.log('=== ADD TO CART DEBUG ===');
+    console.log('Product to add:', product);
+    console.log('Product ID:', product.id);
+    console.log('Product ID type:', typeof product.id);
+
     const cart = getCart();
+    console.log('Current cart before add:', cart);
+
     const existing = cart.find((item) => item.id === product.id);
 
     if (existing) {
+        console.log('Item already exists, increasing qty');
         existing.qty += 1;
     } else {
+        console.log('New item, adding to cart');
         cart.push({ ...product, qty: 1 });
     }
 
+    console.log('Cart after add:', cart);
     saveCart(cart);
+
+    // Verify localStorage was updated
+    const savedCart = getCart();
+    console.log('Cart from localStorage after save:', savedCart);
 }
 
 function increaseQty(id) {
@@ -228,6 +242,15 @@ export function initCart() {
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-add-to-cart]');
         if (!btn) return;
+
+        console.log('=== BUTTON CLICK DEBUG ===');
+        console.log('Button element:', btn);
+        console.log('data-id:', btn.dataset.id);
+        console.log('data-name:', btn.dataset.name);
+        console.log('data-price:', btn.dataset.price);
+        console.log('data-image:', btn.dataset.image);
+        console.log('data-debug-id:', btn.dataset.debugId);
+        console.log('data-debug-firestore:', btn.dataset.debugFirestore);
 
         addToCart({
             id: btn.dataset.id,  // Firestore ID is a string, don't convert to integer

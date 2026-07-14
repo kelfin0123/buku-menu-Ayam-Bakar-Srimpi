@@ -157,12 +157,25 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
+            console.log('=== CHECKOUT PAGE DEBUG ===');
+            console.log('CART_KEY:', CART_KEY);
+
             const cart = getCart();
+            console.log('Cart from localStorage:', cart);
+            console.log('Cart length:', cart.length);
+
             const itemsContainer = document.getElementById('checkoutItemsContainer');
             const summaryContainer = document.getElementById('checkoutSummary');
             const checkoutBtn = document.querySelector('.cart-checkout-btn');
 
+            console.log('Elements found:', {
+                itemsContainer: !!itemsContainer,
+                summaryContainer: !!summaryContainer,
+                checkoutBtn: !!checkoutBtn
+            });
+
             if (cart.length === 0) {
+                console.log('Cart is empty, showing empty message');
                 if (summaryContainer) {
                     summaryContainer.innerHTML = '<p class="empty-cart">Keranjang kosong</p>';
                 }
@@ -173,9 +186,13 @@
             }
 
             // Validate cart against database
+            console.log('Validating cart...');
             const validatedCart = await validateCart(cart);
+            console.log('Validated cart:', validatedCart);
+            console.log('Validated cart length:', validatedCart.length);
 
             if (validatedCart.length === 0) {
+                console.log('Validated cart is empty, showing empty message');
                 if (summaryContainer) {
                     summaryContainer.innerHTML = '<p class="empty-cart">Keranjang kosong. Beberapa produk tidak tersedia lagi.</p>';
                 }
@@ -188,18 +205,39 @@
             // Create hidden inputs for each item using array notation
             let inputsHtml = '';
             validatedCart.forEach((item, index) => {
+                console.log(`Creating hidden input for item ${index}:`, item);
                 inputsHtml += `
                     <input type="hidden" name="items[${index}][product_id]" value="${item.id}">
                     <input type="hidden" name="items[${index}][qty]" value="${item.qty}">
                 `;
             });
 
+            console.log('Hidden inputs HTML:', inputsHtml);
+
             if (itemsContainer) {
                 itemsContainer.innerHTML = inputsHtml;
+                console.log('Hidden inputs injected into DOM');
+            } else {
+                console.error('itemsContainer not found!');
             }
 
             // Render summary
+            console.log('Rendering summary...');
             renderCheckoutSummary(validatedCart);
+            console.log('Summary rendered');
+
+            // Log final form data before submit
+            const form = document.getElementById('checkoutForm');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    console.log('=== FORM SUBMIT DEBUG ===');
+                    const formData = new FormData(form);
+                    console.log('Form data entries:');
+                    for (let [key, value] of formData.entries()) {
+                        console.log(`  ${key}: ${value}`);
+                    }
+                });
+            }
         });
     </script>
 

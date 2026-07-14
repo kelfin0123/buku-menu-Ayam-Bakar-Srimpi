@@ -26,6 +26,17 @@ class MenuController extends Controller
 
         $products = $this->filteredProducts($request)->get();
 
+        // Log product data for debugging
+        \Log::info('MenuController - Products being sent to view:');
+        foreach ($products as $product) {
+            \Log::info([
+                'id' => $product->id,
+                'firestore_id' => $product->firestore_id,
+                'name' => $product->name,
+                'firestore_id_type' => gettype($product->firestore_id),
+            ]);
+        }
+
         return view('customer.menu', [
             'categories'      => $categories,
             'products'        => $products,
