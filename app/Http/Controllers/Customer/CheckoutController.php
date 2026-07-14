@@ -27,6 +27,14 @@ class CheckoutController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Log incoming request for debugging
+        \Log::info('Checkout Request:', [
+            'items' => $request->input('items'),
+            'customer_name' => $request->input('customer_name'),
+            'table_number' => $request->input('table_number'),
+            'payment_method' => $request->input('payment_method'),
+        ]);
+
         $validated = $request->validate([
             'customer_name'    => 'required|string|max:255',
             'table_number'     => 'required|string|max:50',
@@ -40,7 +48,9 @@ class CheckoutController extends Controller
         $itemsData = [];
 
         foreach ($validated['items'] as $item) {
+            \Log::info('Looking up product:', ['product_id' => $item['product_id']]);
             $product = Product::where('firestore_id', $item['product_id'])->firstOrFail();
+            \Log::info('Product found:', ['id' => $product->id, 'firestore_id' => $product->firestore_id, 'name' => $product->name]);
             $lineTotal = $product->final_price * $item['qty'];
             $subtotal += $lineTotal;
 
