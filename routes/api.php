@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use Illuminate\Support\Facades\Route;
 
@@ -11,12 +13,24 @@ Route::post('products', [ProductController::class, 'store']);
 Route::match(['put', 'post'], 'products/{product}', [ProductController::class, 'update']);
 Route::delete('products/{product}', [ProductController::class, 'destroy']);
 
+Route::post('checkout', [CheckoutController::class, 'store']);
+
 Route::prefix('orders')->group(function () {
-    Route::get('pending', [OrderController::class, 'pending']);
+    Route::get('code/{orderCode}', [OrderController::class, 'showByCode']);
+    Route::get('incoming', [OrderController::class, 'incoming']);
     Route::post('{order}/accept', [OrderController::class, 'accept']);
     Route::post('{order}/reject', [OrderController::class, 'reject']);
-    Route::get('employee-activities', [OrderController::class, 'employeeActivities']);
-    Route::post('{order}/finish', [OrderController::class, 'finish']);
+    Route::get('activities', [OrderController::class, 'activities']);
+    Route::post('{order}/ready', [OrderController::class, 'ready']);
+    Route::post('{order}/complete', [OrderController::class, 'complete']);
+    Route::get('statistics', [OrderController::class, 'statistics']);
+});
+
+Route::prefix('payment')->group(function () {
+    Route::post('{order}/qris', [PaymentController::class, 'generateQris']);
+    Route::get('{order}/status', [PaymentController::class, 'checkStatus']);
+    Route::post('callback', [PaymentController::class, 'handleCallback']);
+    Route::post('{order}/confirm-cash', [PaymentController::class, 'confirmCashPayment']);
 });
 
 Route::prefix('v1')->group(function () {

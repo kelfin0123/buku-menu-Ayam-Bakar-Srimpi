@@ -30,13 +30,33 @@ class Order extends Model
         'finished_at',
         'rejected_at',
         'rejection_reason',
+        'expires_at',
     ];
 
     protected $casts = [
         'accepted_at' => 'datetime',
         'finished_at' => 'datetime',
         'rejected_at' => 'datetime',
+        'expires_at' => 'datetime',
     ];
+
+    // Order Status Constants
+    const STATUS_WAITING_PAYMENT = 'waiting_payment';
+    const STATUS_NEW_ORDER = 'new_order';
+    const STATUS_PROCESSING = 'processing';
+    const STATUS_READY = 'ready';
+    const STATUS_COMPLETED = 'completed';
+    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_EXPIRED = 'expired';
+
+    // Payment Status Constants
+    const PAYMENT_STATUS_PENDING = 'pending';
+    const PAYMENT_STATUS_PAID = 'paid';
+    const PAYMENT_STATUS_FAILED = 'failed';
+
+    // Payment Method Constants
+    const PAYMENT_METHOD_CASH = 'cash';
+    const PAYMENT_METHOD_QRIS = 'qris';
 
     public function items(): HasMany
     {
@@ -47,5 +67,44 @@ class Order extends Model
     public static function generateOrderCode(): string
     {
         return 'ABS-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4));
+    }
+
+    /** Check if order is expired */
+    public function isExpired(): bool
+    {
+        return $this->expires_at && $this->expires_at->isPast();
+    }
+
+    /** Mark order as expired and restore stock */
+    public function markAsExpired(): void
+    {
+        $this->status = self::STATUS_EXPIRED;
+        $this->payment_status = self::PAYMENT_STATUS_FAILED;
+        $this->save();
+
+        // Restore stock
+        foreach ($this->items as $item) {
+            if ($item->product) {
+                $item->product->increment('stock', $item->qty);
+            }
+        }
+    }
+
+    /** Scope for incoming orders (new orders waiting for acceptance) */
+    public function scopeIncoming($query)
+    {
+        return $query->whereIn('status', [self::STATUS_NEW_ORDER, self::STATUS_WAITING_PAYMENT])
+            ->where('payment_status', self::PAYMENT_STATUS_PAID)
+            ->orderByDesc('created_at');
+    }
+
+    /** Scope for active orders (not cancelled, expired, or completed) */
+    public function scopeActive($query)
+    {
+        return $query->whereNotIn('status', [
+            self::STATUS_CANCELLED,
+            self::STATUS_EXPIRED,
+            self::STATUS_COMPLETED
+        ]);
     }
 }

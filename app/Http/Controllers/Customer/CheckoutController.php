@@ -12,30 +12,25 @@ use Illuminate\View\View;
 
 class CheckoutController extends Controller
 {
-    private const SHIPPING_COST = 5000;
-
     /**
      * Tampilkan halaman checkout. Data keranjang dikirim dari localStorage (JS)
-     * lalu di-render ulang lewat form tersembunyi / fetch ke endpoint store().
+     * lalu dikirim ke API endpoint.
      */
     public function index(): View
     {
-        return view('customer.checkout', [
-            'shippingCost' => self::SHIPPING_COST,
-        ]);
+        return view('customer.checkout');
     }
 
     /**
-     * Simpan order dari data keranjang (JSON: [{product_id, qty}, ...]).
-     * Tahap ini HANYA membuat record order (status pending), integrasi
-     * Midtrans Snap token akan ditambahkan pada langkah berikutnya.
+     * Simpan pesanan dari data keranjang (JSON: [{product_id, qty}, ...]).
+     * Order dibuat dengan status waiting_payment dan expires_at 5 menit.
      */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'customer_name'    => 'required|string|max:255',
-            'customer_phone'   => 'required|string|max:20',
-            'customer_address' => 'nullable|string',
+            'table_number'     => 'required|string|max:50',
+            'payment_method'   => 'required|in:cash,qris',
             'items'            => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.qty'         => 'required|integer|min:1',
@@ -58,24 +53,107 @@ class CheckoutController extends Controller
             ];
         }
 
-        $order = Order::create([
-            'order_code'        => Order::generateOrderCode(),
-            'customer_name'     => $validated['customer_name'],
-            'customer_phone'    => $validated['customer_phone'],
-            'customer_address'  => $validated['customer_address'] ?? null,
-            'subtotal'          => $subtotal,
-            'shipping_cost'     => self::SHIPPING_COST,
-            'total'             => $subtotal + self::SHIPPING_COST,
-            'payment_status'    => 'pending',
-            'status'            => 'waiting',
-        ]);
+        // Buat order dengan transaksi database
+        \DB::beginTransaction();
+        try {
+            $order = Order::create([
+                'order_code'        => Order::generateOrderCode(),
+                'customer_name'     => $validated['customer_name'],
+                'customer_phone'    => null,
+                'customer_address'  => null,
+                'table_number'      => $validated['table_number'],
+                'subtotal'          => $subtotal,
+                'shipping_cost'     => 0,
+                'total'             => $subtotal,
+                'payment_method'    => $validated['payment_method'],
+                'payment_status'    => 'pending',
+                'status'            => 'waiting_payment',
+                'expires_at'        => now()->addMinutes(5),
+            ]);
 
-        foreach ($itemsData as $data) {
-            $order->items()->create($data);
+            foreach ($itemsData as $data) {
+                $order->items()->create($data);
+            }
+
+            \DB::commit();
+
+            return redirect()
+                ->route('checkout.payment', $order->order_code)
+                ->with('success', 'Pesanan berhasil dibuat!');
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return back()
+                ->withInput()
+                ->withErrors(['error' => 'Terjadi kesalahan saat membuat pesanan. Silakan coba lagi.']);
+        }
+    }
+
+    /**
+     * Redirect to payment page after checkout
+     */
+    public function payment(Request $request, string $orderCode): View
+    {
+        return view('customer.payment', [
+            'orderCode' => $orderCode,
+        ]);
+    }
+
+    /**
+     * Cek status pembayaran (AJAX)
+     */
+    public function status(Request $request, string $orderCode)
+    {
+        $order = Order::where('order_code', $orderCode)->first();
+
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan tidak ditemukan',
+            ], 404);
         }
 
-        return redirect()
-            ->route('order.show', $order->order_code)
-            ->with('success', 'Pesanan berhasil dibuat!');
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'order_code' => $order->order_code,
+                'status' => $order->status,
+                'payment_status' => $order->payment_status,
+                'is_expired' => $order->isExpired(),
+            ],
+        ]);
+    }
+
+    /**
+     * Batalkan pesanan
+     */
+    public function cancel(Request $request, string $orderCode): RedirectResponse
+    {
+        $order = Order::where('order_code', $orderCode)->first();
+
+        if (!$order) {
+            return back()->withErrors(['error' => 'Pesanan tidak ditemukan']);
+        }
+
+        if ($order->status === 'completed' || $order->status === 'cancelled') {
+            return back()->withErrors(['error' => 'Pesanan tidak dapat dibatalkan']);
+        }
+
+        \DB::beginTransaction();
+        try {
+            $order->status = 'cancelled';
+            $order->payment_status = 'failed';
+            $order->save();
+
+            \DB::commit();
+
+            return redirect()
+                ->route('home')
+                ->with('success', 'Pesanan berhasil dibatalkan.');
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return back()->withErrors(['error' => 'Terjadi kesalahan saat membatalkan pesanan.']);
+        }
     }
 }
