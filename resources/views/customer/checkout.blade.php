@@ -53,7 +53,7 @@
             </div>
 
             {{-- Ringkasan diambil dari localStorage lewat cart.js lalu disuntikkan sebagai hidden input --}}
-            <input type="hidden" name="items" id="checkoutItemsInput">
+            <div id="checkoutItemsContainer"></div>
 
             <div id="checkoutSummary" class="checkout-summary"></div>
 
@@ -65,10 +65,10 @@
     </section>
 
     <script>
-        // Load cart data and populate hidden input
+        // Load cart data and populate hidden inputs as array
         document.addEventListener('DOMContentLoaded', function() {
             const cart = JSON.parse(localStorage.getItem('ayam_bakar_srimpi_cart')) || [];
-            const itemsInput = document.getElementById('checkoutItemsInput');
+            const itemsContainer = document.getElementById('checkoutItemsContainer');
             
             if (cart.length === 0) {
                 document.getElementById('checkoutSummary').innerHTML = '<p class="empty-cart">Keranjang kosong</p>';
@@ -76,13 +76,15 @@
                 return;
             }
             
-            // Convert cart to items array format
-            const items = cart.map(item => ({
-                product_id: item.id,
-                qty: item.qty
-            }));
-            
-            itemsInput.value = JSON.stringify(items);
+            // Create hidden inputs for each item using array notation
+            let inputsHtml = '';
+            cart.forEach((item, index) => {
+                inputsHtml += `
+                    <input type="hidden" name="items[${index}][product_id]" value="${item.id}">
+                    <input type="hidden" name="items[${index}][qty]" value="${item.qty}">
+                `;
+            });
+            itemsContainer.innerHTML = inputsHtml;
             
             // Render summary
             renderCheckoutSummary(cart);
@@ -248,6 +250,45 @@
         .alert-danger ul {
             margin: 0;
             padding-left: 1.5rem;
+        }
+        
+        /* Dark mode styles */
+        @media (prefers-color-scheme: dark) {
+            .payment-method-option {
+                border-color: #374151;
+            }
+            
+            .payment-method-option:hover {
+                border-color: #f59e0b;
+            }
+            
+            .checkout-item-name {
+                color: #f3f4f6;
+            }
+            
+            .checkout-item-qty {
+                color: #9ca3af;
+            }
+            
+            .checkout-item {
+                border-bottom-color: #374151;
+            }
+            
+            .checkout-total {
+                background: #374151;
+            }
+            
+            .checkout-total-final {
+                border-top-color: #4b5563;
+            }
+            
+            .empty-cart {
+                color: #9ca3af;
+            }
+            
+            .checkout-item-price {
+                color: #fbbf24;
+            }
         }
     </style>
 @endsection
