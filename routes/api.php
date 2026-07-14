@@ -12,6 +12,7 @@ Route::post('products/upload-image', [ProductController::class, 'uploadImage']);
 Route::post('products', [ProductController::class, 'store']);
 Route::match(['put', 'post'], 'products/{product}', [ProductController::class, 'update']);
 Route::delete('products/{product}', [ProductController::class, 'destroy']);
+Route::post('products/validate', [ProductController::class, 'validateProducts']);
 
 Route::post('checkout', [CheckoutController::class, 'store']);
 

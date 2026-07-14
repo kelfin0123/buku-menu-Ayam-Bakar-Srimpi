@@ -77,6 +77,9 @@ class CheckoutController extends Controller
 
             \DB::commit();
 
+            // Clear cart from localStorage by setting a session flag
+            session(['clear_cart' => true]);
+
             return redirect()
                 ->route('checkout.payment', $order->order_code)
                 ->with('success', 'Pesanan berhasil dibuat!');

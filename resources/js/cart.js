@@ -21,6 +21,91 @@ function saveCart(cart) {
     updateTopbarCount();
 }
 
+/**
+ * Validate cart items against database
+ * Remove items that no longer exist in database
+ */
+async function validateCart() {
+    const cart = getCart();
+    if (cart.length === 0) return cart;
+
+    try {
+        const productIds = cart.map(item => item.id);
+        const response = await fetch('/api/products/validate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ product_ids: productIds })
+        });
+
+        const result = await response.json();
+
+        if (!result.valid && result.invalid_ids && result.invalid_ids.length > 0) {
+            // Remove invalid products from cart
+            const validCart = cart.filter(item => result.valid_ids.includes(item.id));
+            localStorage.setItem(CART_KEY, JSON.stringify(validCart));
+
+            // Show notification to user
+            const invalidCount = result.invalid_ids.length;
+            if (invalidCount > 0) {
+                // Use a subtle notification instead of alert
+                showCartNotification(`${invalidCount} produk di keranjang tidak tersedia lagi dan telah dihapus.`);
+            }
+
+            return validCart;
+        }
+
+        return cart;
+    } catch (error) {
+        console.error('Error validating cart:', error);
+        return cart; // Return original cart if validation fails
+    }
+}
+
+function showCartNotification(message) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #fef3c7;
+        color: #92400e;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 9999;
+        font-size: 14px;
+        border-left: 4px solid #f59e0b;
+        animation: slideIn 0.3s ease-out;
+    `;
+    notification.textContent = message;
+
+    // Add animation keyframes
+    if (!document.getElementById('cart-notification-style')) {
+        const style = document.createElement('style');
+        style.id = 'cart-notification-style';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(notification);
+
+    // Remove after 5 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideIn 0.3s ease-out reverse';
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+}
+
 function formatRupiah(number) {
     return 'Rp ' + Number(number).toLocaleString('id-ID');
 }
@@ -133,6 +218,12 @@ function renderCart() {
 }
 
 export function initCart() {
+    // Validate cart on initialization
+    validateCart().then(validatedCart => {
+        renderCart();
+        updateTopbarCount();
+    });
+
     // Tombol "+" pada tiap product card
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-add-to-cart]');
@@ -162,10 +253,7 @@ export function initCart() {
     document.getElementById('viewOrdersBtn')?.addEventListener('click', () => {
         document.getElementById('cartPanel')?.scrollIntoView({ behavior: 'smooth' });
     });
-
-    renderCart();
-    updateTopbarCount();
 }
 
 // Diekspor agar bisa dipakai halaman checkout untuk mengisi ringkasan & hidden input
-export { getCart, calculateSubtotal, formatRupiah, SHIPPING_COST };
+export { getCart, calculateSubtotal, formatRupiah, SHIPPING_COST, validateCart, clearCart };

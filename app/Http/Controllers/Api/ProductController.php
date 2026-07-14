@@ -163,4 +163,21 @@ class ProductController extends Controller
             'message' => 'Produk berhasil dihapus',
         ]);
     }
+
+    public function validateProducts(Request $request): JsonResponse
+    {
+        $request->validate([
+            'product_ids' => 'required|array',
+            'product_ids.*' => 'integer',
+        ]);
+
+        $requestedIds = $request->input('product_ids');
+        $existingIds = Product::whereIn('id', $requestedIds)->pluck('id')->toArray();
+
+        return response()->json([
+            'valid' => count($requestedIds) === count($existingIds),
+            'valid_ids' => $existingIds,
+            'invalid_ids' => array_diff($requestedIds, $existingIds),
+        ]);
+    }
 }

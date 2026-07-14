@@ -18,6 +18,11 @@
         const orderCode = '{{ $orderCode }}';
         const API_URL = '/api';
 
+        // Clear cart if session flag is set
+        @if(session('clear_cart'))
+        localStorage.removeItem('ayam_bakar_srimpi_cart');
+        @endif
+
         // Load payment data
         async function loadPaymentData() {
             try {

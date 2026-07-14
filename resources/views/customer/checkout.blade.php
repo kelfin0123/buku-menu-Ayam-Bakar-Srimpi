@@ -64,10 +64,12 @@
         </form>
     </section>
 
-    <script>
+    <script type="module">
+        import { getCart, validateCart, clearCart } from '/resources/js/cart.js';
+
         // Load cart data and populate hidden inputs as array
-        document.addEventListener('DOMContentLoaded', function() {
-            const cart = JSON.parse(localStorage.getItem('ayam_bakar_srimpi_cart')) || [];
+        document.addEventListener('DOMContentLoaded', async function() {
+            const cart = getCart();
             const itemsContainer = document.getElementById('checkoutItemsContainer');
             
             if (cart.length === 0) {
@@ -76,9 +78,18 @@
                 return;
             }
             
+            // Validate cart using shared function
+            const validatedCart = await validateCart();
+            
+            if (validatedCart.length === 0) {
+                document.getElementById('checkoutSummary').innerHTML = '<p class="empty-cart">Keranjang kosong. Beberapa produk tidak tersedia lagi.</p>';
+                document.querySelector('.cart-checkout-btn').disabled = true;
+                return;
+            }
+            
             // Create hidden inputs for each item using array notation
             let inputsHtml = '';
-            cart.forEach((item, index) => {
+            validatedCart.forEach((item, index) => {
                 inputsHtml += `
                     <input type="hidden" name="items[${index}][product_id]" value="${item.id}">
                     <input type="hidden" name="items[${index}][qty]" value="${item.qty}">
@@ -87,7 +98,7 @@
             itemsContainer.innerHTML = inputsHtml;
             
             // Render summary
-            renderCheckoutSummary(cart);
+            renderCheckoutSummary(validatedCart);
         });
 
         function renderCheckoutSummary(cart) {
