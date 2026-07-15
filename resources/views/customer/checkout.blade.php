@@ -35,30 +35,13 @@
                 <input type="text" name="table_number" id="table_number" required placeholder="Contoh: A1, B2" value="{{ old('table_number') }}">
             </div>
 
-            {{-- Payment Method Selection --}}
-            <div class="checkout-field">
-                <label>Metode Pembayaran</label>
-                <div class="payment-methods">
-                    <label class="payment-method-option">
-                        <input type="radio" name="payment_method" value="cash" required {{ old('payment_method') == 'cash' ? 'checked' : '' }}>
-                        <span class="payment-method-icon">💵</span>
-                        <span class="payment-method-label">Tunai</span>
-                    </label>
-                    <label class="payment-method-option">
-                        <input type="radio" name="payment_method" value="qris" required {{ old('payment_method') == 'qris' ? 'checked' : '' }}>
-                        <span class="payment-method-icon">📱</span>
-                        <span class="payment-method-label">QRIS</span>
-                    </label>
-                </div>
-            </div>
-
             {{-- Ringkasan diambil dari localStorage lewat cart.js lalu disuntikkan sebagai hidden input --}}
             <div id="checkoutItemsContainer"></div>
 
             <div id="checkoutSummary" class="checkout-summary"></div>
 
             <button type="submit" class="cart-checkout-btn">
-                Bayar Sekarang
+                Kirim Pesanan
                 <span>@include('components.icons.send')</span>
             </button>
         </form>
@@ -209,9 +192,9 @@
 
             let inputsHtml = '';
             validatedCart.forEach((item, index) => {
-                console.log(`Creating input for item ${index}, product_id:`, item.id);
+                console.log(`Creating input for item ${index}, firestore_id:`, item.id);
                 inputsHtml += `
-                    <input type="hidden" name="items[${index}][product_id]" value="${item.id}">
+                    <input type="hidden" name="items[${index}][firestore_id]" value="${item.id}">
                     <input type="hidden" name="items[${index}][qty]" value="${item.qty}">
                 `;
             });
