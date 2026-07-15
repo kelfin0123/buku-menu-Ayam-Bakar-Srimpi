@@ -135,6 +135,7 @@ function addToCart(product) {
     // Verify localStorage was updated
     const savedCart = getCart();
     console.log('Cart from localStorage after save:', savedCart);
+    console.log('localStorage raw:', localStorage.getItem(CART_KEY));
 }
 
 function increaseQty(id) {

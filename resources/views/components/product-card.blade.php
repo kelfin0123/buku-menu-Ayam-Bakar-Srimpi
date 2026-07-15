@@ -31,6 +31,13 @@
                     aria-label="Tambah {{ $product->name }} ke keranjang">
                 @include('components.icons.plus')
             </button>
+            {{-- Debug: Log HTML rendering --}}
+            @php
+                \Log::info('product-card HTML rendered for ' . $product->name, [
+                    'firestore_id' => $product->firestore_id,
+                    'data_id_value' => $product->firestore_id,
+                ]);
+            @endphp
         </div>
     </div>
 </article>

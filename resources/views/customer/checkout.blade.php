@@ -203,9 +203,13 @@
             }
 
             // Create hidden inputs for each item using array notation
+            console.log('=== BEFORE CREATING HIDDEN INPUTS ===');
+            console.log('Cart:', cart);
+            console.log('Cart IDs:', cart.map(i => i.id));
+
             let inputsHtml = '';
             validatedCart.forEach((item, index) => {
-                console.log(`Creating hidden input for item ${index}:`, item);
+                console.log(`Creating input for item ${index}, product_id:`, item.id);
                 inputsHtml += `
                     <input type="hidden" name="items[${index}][product_id]" value="${item.id}">
                     <input type="hidden" name="items[${index}][qty]" value="${item.qty}">

@@ -16,7 +16,7 @@
             <button type="button"
                     class="product-card-add-btn product-detail-add-btn"
                     data-add-to-cart
-                    data-id="{{ $product->id }}"
+                    data-id="{{ $product->firestore_id }}"
                     data-name="{{ $product->name }}"
                     data-price="{{ $product->final_price }}"
                     data-image="{{ $product->image_url }}">
