@@ -9,6 +9,7 @@ use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\ProductStorageService;
+use App\Services\OrderProductResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -17,7 +18,10 @@ class ProductController extends Controller
 {
     protected ProductStorageService $storageService;
 
-    public function __construct(ProductStorageService $storageService)
+    public function __construct(
+        ProductStorageService $storageService,
+        private readonly OrderProductResolver $orderProductResolver,
+    )
     {
         $this->storageService = $storageService;
     }
@@ -172,7 +176,10 @@ class ProductController extends Controller
         ]);
 
         $requestedIds = $request->input('product_ids');
-        $existingIds = Product::whereIn('firestore_id', $requestedIds)->pluck('firestore_id')->toArray();
+        $existingIds = collect($requestedIds)
+            ->filter(fn (string $id) => $this->orderProductResolver->resolve($id) !== null)
+            ->values()
+            ->all();
 
         return response()->json([
             'valid' => count($requestedIds) === count($existingIds),

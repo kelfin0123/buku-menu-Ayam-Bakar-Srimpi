@@ -4,14 +4,15 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
+use App\Services\OrderProductResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CheckoutController extends Controller
 {
+    public function __construct(private readonly OrderProductResolver $productResolver) {}
+
     /**
      * Tampilkan halaman checkout. Data keranjang dikirim dari localStorage (JS)
      * lalu dikirim ke API endpoint.
@@ -40,7 +41,13 @@ class CheckoutController extends Controller
         $itemsData = [];
 
         foreach ($validated['items'] as $item) {
-            $product = Product::where('firestore_id', $item['firestore_id'])->firstOrFail();
+            $product = $this->productResolver->resolve($item['firestore_id']);
+
+            if (!$product) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['items' => "Produk {$item['firestore_id']} tidak ditemukan atau tidak aktif di Firebase."]);
+            }
             $lineTotal = $product->final_price * $item['qty'];
             $subtotal += $lineTotal;
 
@@ -77,7 +84,7 @@ class CheckoutController extends Controller
 
             session(['clear_cart' => true]);
 
-            return redirect('/')
+            return redirect()->route('order.show', $order->order_code)
                 ->with('success', 'Pesanan berhasil dikirim!');
         } catch (\Exception $e) {
             \DB::rollBack();
