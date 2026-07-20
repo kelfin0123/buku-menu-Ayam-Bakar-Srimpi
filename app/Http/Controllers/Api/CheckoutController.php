@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Product;
-use Illuminate\Http\Request;
+use App\Services\FirestoreOrderService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CheckoutController extends Controller
 {
+    public function __construct(
+        private readonly FirestoreOrderService $firestoreOrders,
+    ) {}
+
     /**
      * Create order from cart data
      */
@@ -49,6 +53,8 @@ class CheckoutController extends Controller
             $order = Order::create([
                 'order_code' => Order::generateOrderCode(),
                 'customer_name' => $validated['customer_name'],
+                'customer_phone' => '',
+                'customer_address' => null,
                 'table_number' => $validated['table_number'],
                 'payment_method' => $validated['payment_method'],
                 'subtotal' => $subtotal,
@@ -66,6 +72,8 @@ class CheckoutController extends Controller
 
             \DB::commit();
 
+            $this->firestoreOrders->sync($order->fresh('items.product'));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Pesanan berhasil dibuat',
@@ -80,6 +88,7 @@ class CheckoutController extends Controller
 
         } catch (\Exception $e) {
             \DB::rollBack();
+
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat membuat pesanan',

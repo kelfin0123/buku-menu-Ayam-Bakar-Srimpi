@@ -2,16 +2,65 @@
 
 namespace Tests\Feature;
 
+use App\Models\Category;
 use App\Models\Order;
+use App\Models\Product;
+use App\Services\FirestoreOrderService;
+use App\Services\FirestoreTransactionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class OrderApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_api_checkout_persists_required_customer_fields_and_syncs_firestore(): void
+    {
+        $category = Category::create([
+            'name' => 'Makanan',
+            'slug' => 'makanan-api',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Ayam API',
+            'slug' => 'ayam-api',
+            'price' => 25000,
+            'is_promo' => false,
+            'is_active' => true,
+            'sort_order' => 1,
+            'firestore_id' => 'firestore-api-product',
+        ]);
+
+        $this->mock(FirestoreOrderService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sync')->once()->andReturnTrue();
+        });
+
+        $this->postJson('/api/checkout', [
+            'customer_name' => 'Customer API',
+            'table_number' => 'API-1',
+            'payment_method' => 'cash',
+            'items' => [[
+                'product_id' => $product->firestore_id,
+                'qty' => 1,
+            ]],
+        ])->assertCreated()->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('orders', [
+            'customer_name' => 'Customer API',
+            'customer_phone' => '',
+            'status' => Order::STATUS_WAITING_PAYMENT,
+        ]);
+    }
+
     public function test_pending_accept_reject_and_finish_workflow(): void
     {
+        $this->mock(FirestoreTransactionService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('syncCompletedOrder')->once()->andReturnTrue();
+        });
+
         $order = Order::create([
             'order_code' => 'ABS-20260713-0001',
             'customer_name' => 'Budi',
@@ -44,7 +93,9 @@ class OrderApiTest extends TestCase
             'employee_id' => 7,
         ]);
 
-        $finishResponse = $this->postJson("/api/orders/{$order->id}/complete");
+        $finishResponse = $this->postJson("/api/orders/{$order->id}/complete", [
+            'employee_uid' => 'firebase-employee-uid',
+        ]);
         $finishResponse->assertOk()
             ->assertJsonPath('data.status', Order::STATUS_COMPLETED);
 
@@ -79,5 +130,17 @@ class OrderApiTest extends TestCase
             'status' => Order::STATUS_CANCELLED,
             'rejection_reason' => 'Stok habis',
         ]);
+    }
+
+    public function test_completed_order_uses_a_stable_firestore_transaction_document_id(): void
+    {
+        $order = new Order(['order_code' => 'ABS-20260721-IDEM']);
+
+        $service = app(FirestoreTransactionService::class);
+
+        $this->assertSame(
+            'web_order_ABS-20260721-IDEM',
+            $service->documentId($order),
+        );
     }
 }
