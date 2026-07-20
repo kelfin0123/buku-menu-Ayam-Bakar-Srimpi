@@ -1,48 +1,35 @@
-<article class="product-card" data-product-id="{{ $product->id }}">
-    <a href="{{ route('product.show', $product->slug) }}" class="product-card-image-link">
-        <img src="{{ $product->image_url }}"
-             alt="{{ $product->name }}"
+<article class="product-card" data-product-id="{{ $product['id'] }}">
+    <div class="product-card-image-link">
+        <img src="{{ $product['imageUrl'] ?: asset('images/no-image.png') }}"
+             alt="{{ $product['name'] }}"
              class="product-card-image"
              loading="lazy"
-             onerror="this.src='https://images.unsplash.com/photo-1598103442097-8b74394b95c6?w=500&q=80'">
-        @if ($product->is_promo)
-            <span class="product-card-badge">Promo</span>
-        @endif
-    </a>
+             onerror="this.src='{{ asset('images/no-image.png') }}'">
+    </div>
 
     <div class="product-card-body">
-        <h3 class="product-card-title">{{ $product->name }}</h3>
-        <p class="product-card-desc">{{ $product->description }}</p>
+        <h3 class="product-card-title">{{ $product['name'] }}</h3>
+        <p class="product-card-desc">{{ $product['description'] }}</p>
+        <p class="product-card-desc">{{ $product['category'] }}</p>
 
         <div class="product-card-footer">
             <div>
                 <span class="product-card-price">
-                    Rp {{ number_format($product->final_price, 0, ',', '.') }}
+                    Rp {{ number_format($product['price'], 0, ',', '.') }}
                 </span>
-                <div class="product-card-stock">
-                    Stok: {{ $product->stock ?? 0 }}
-                </div>
+                <div class="product-card-stock">Stok: {{ $product['stock'] }}</div>
             </div>
 
             <button type="button"
                     class="product-card-add-btn"
                     data-add-to-cart
-                    data-id="{{ $product->firestore_id }}"
-                    data-name="{{ $product->name }}"
-                    data-price="{{ $product->final_price }}"
-                    data-image="{{ $product->image_url }}"
-                    data-debug-id="{{ $product->id }}"
-                    data-debug-firestore="{{ $product->firestore_id }}"
-                    aria-label="Tambah {{ $product->name }} ke keranjang">
+                    data-id="{{ $product['id'] }}"
+                    data-name="{{ $product['name'] }}"
+                    data-price="{{ $product['price'] }}"
+                    data-image="{{ $product['imageUrl'] ?: asset('images/no-image.png') }}"
+                    aria-label="Tambah {{ $product['name'] }} ke keranjang">
                 @include('components.icons.plus')
             </button>
-            {{-- Debug: Log HTML rendering --}}
-            @php
-                \Log::info('product-card HTML rendered for ' . $product->name, [
-                    'firestore_id' => $product->firestore_id,
-                    'data_id_value' => $product->firestore_id,
-                ]);
-            @endphp
         </div>
     </div>
 </article>

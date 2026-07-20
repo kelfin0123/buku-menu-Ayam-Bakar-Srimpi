@@ -33,7 +33,10 @@
     <x-category :categories="$categories" :active="$activeCategory" />
 
     {{-- Grid Produk --}}
-    @include('customer.partials.product-grid', ['products' => $products])
+    @include('customer.partials.product-grid', [
+        'products' => $products,
+        'firestoreError' => $firestoreError,
+    ])
 
 @endsection
 

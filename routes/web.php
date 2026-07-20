@@ -4,6 +4,7 @@ use App\Http\Controllers\Customer\CheckoutController;
 use App\Http\Controllers\Customer\MenuController;
 use App\Http\Controllers\Customer\OrderController;
 use App\Http\Controllers\Customer\ProductController;
+use App\Services\FirestoreProductService;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,6 +17,22 @@ use Illuminate\Support\Facades\Route;
 // HOME
 // ===============================
 Route::get('/', [MenuController::class, 'index'])->name('home');
+
+Route::get('/debug/firestore-products', function (FirestoreProductService $service) {
+    $configuredToken = (string) config('firebase.debug_token', '');
+
+    abort_if(
+        app()->environment('production') &&
+        ($configuredToken === '' || !hash_equals($configuredToken, (string) request()->bearerToken())),
+        404,
+    );
+
+    return response()->json([
+        'project_id' => config('firebase.project_id'),
+        'collection' => config('firebase.products_collection'),
+        'products' => $service->getProducts(),
+    ]);
+})->name('debug.firestore-products');
 
 // ===============================
 // MENU
