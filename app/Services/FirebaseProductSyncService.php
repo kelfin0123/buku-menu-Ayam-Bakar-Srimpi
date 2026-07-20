@@ -15,7 +15,11 @@ class FirebaseProductSyncService
 
     public function __construct()
     {
-        $this->firebaseUrl = config('services.firebase.products_url', 'https://firestore.googleapis.com/v1/projects/kasir-40363/databases/(default)/documents/products');
+        $projectId = config('firebase.project_id', config('services.firebase.project_id', 'kasir-40363'));
+        $collection = config('firebase.products_collection', config('services.firebase.products_collection', 'products'));
+        $defaultUrl = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}";
+
+        $this->firebaseUrl = config('firebase.products_url', config('services.firebase.products_url', $defaultUrl));
         $this->result = new SyncResult();
     }
 
@@ -99,18 +103,15 @@ class FirebaseProductSyncService
      */
     private function syncProduct(string $firestoreId, array $fields): void
     {
-        $name = $fields['name']['stringValue'] ?? '';
-        $price = $fields['price']['doubleValue'] ?? $fields['price']['integerValue'] ?? 0;
-        $categoryName = $fields['category']['stringValue'] ?? 'Umum';
-        $description = $fields['description']['stringValue'] ?? '';
-        $imageUrl = $fields['imageUrl']['stringValue'] ?? null;
-        $isActive = $fields['isActive']['booleanValue'] ?? true;
-        $stock = $fields['stock']['integerValue'] ?? 0;
-        $minimumStock = $fields['minimumStock']['integerValue'] ?? 5;
-        $barcode = $fields['barcode']['stringValue'] ?? '';
-        $costPrice = $fields['costPrice']['doubleValue'] ?? $fields['costPrice']['integerValue'] ?? 0;
-        $supplier = $fields['supplier']['stringValue'] ?? null;
-        $purchaseInvoice = $fields['purchaseInvoice']['stringValue'] ?? null;
+        $name = $this->getStringValue($fields, 'name');
+        $price = $this->getNumericValue($fields, 'price');
+        $categoryName = $this->getStringValue($fields, 'category', 'stringValue', 'Umum');
+        $description = $this->getStringValue($fields, 'description');
+        $imageUrl = $this->getStringValue($fields, 'imageUrl', 'stringValue', null);
+        $isActive = $this->getBooleanValue($fields, 'isActive', true);
+        $stock = $this->getIntegerValue($fields, 'stock', 0);
+        $minimumStock = $this->getIntegerValue($fields, 'minimumStock', 5);
+        $barcode = $this->getStringValue($fields, 'barcode');
 
         // Get or create Category
         $category = Category::firstOrCreate(
@@ -136,6 +137,7 @@ class FirebaseProductSyncService
                     'slug' => Str::slug($name) . '-' . $firestoreId,
                     'description' => $description,
                     'price' => intval($price),
+                    'stock' => $stock,
                     'image' => $imageUrl,
                     'is_active' => $isActive,
                     'sort_order' => 1,
@@ -157,6 +159,7 @@ class FirebaseProductSyncService
                 'slug' => Str::slug($name) . '-' . $firestoreId,
                 'description' => $description,
                 'price' => intval($price),
+                'stock' => $stock,
                 'image' => $imageUrl,
                 'is_active' => $isActive,
                 'sort_order' => 1,
@@ -181,32 +184,85 @@ class FirebaseProductSyncService
             $changes['category_id'] = ['old' => $product->category_id, 'new' => $newCategoryId];
         }
 
-        $name = $fields['name']['stringValue'] ?? '';
+        $name = $this->getStringValue($fields, 'name');
         if ($product->name !== $name) {
             $changes['name'] = ['old' => $product->name, 'new' => $name];
         }
 
-        $price = $fields['price']['doubleValue'] ?? $fields['price']['integerValue'] ?? 0;
+        $price = $this->getNumericValue($fields, 'price');
         if ($product->price !== intval($price)) {
             $changes['price'] = ['old' => $product->price, 'new' => intval($price)];
         }
 
-        $description = $fields['description']['stringValue'] ?? '';
+        $description = $this->getStringValue($fields, 'description');
         if ($product->description !== $description) {
             $changes['description'] = ['old' => $product->description, 'new' => $description];
         }
 
-        $imageUrl = $fields['imageUrl']['stringValue'] ?? null;
+        $imageUrl = $this->getStringValue($fields, 'imageUrl', 'stringValue', null);
         if ($product->image !== $imageUrl) {
             $changes['image'] = ['old' => $product->image, 'new' => $imageUrl];
         }
 
-        $isActive = $fields['isActive']['booleanValue'] ?? true;
+        $isActive = $this->getBooleanValue($fields, 'isActive', true);
         if ($product->is_active !== $isActive) {
             $changes['is_active'] = ['old' => $product->is_active, 'new' => $isActive];
         }
 
+        $stock = $this->getIntegerValue($fields, 'stock', 0);
+        if ($product->stock !== $stock) {
+            $changes['stock'] = ['old' => $product->stock, 'new' => $stock];
+        }
+
         return $changes;
+    }
+
+    private function getStringValue(array $fields, string $field, string $valueKey = 'stringValue', ?string $default = ''): ?string
+    {
+        $value = $fields[$field][$valueKey] ?? null;
+
+        if ($value === null) {
+            return $default;
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        return (string) $value;
+    }
+
+    private function getBooleanValue(array $fields, string $field, bool $default = true): bool
+    {
+        $value = $fields[$field]['booleanValue'] ?? null;
+
+        if ($value === null) {
+            return $default;
+        }
+
+        return (bool) $value;
+    }
+
+    private function getIntegerValue(array $fields, string $field, int $default = 0): int
+    {
+        $value = $fields[$field]['integerValue'] ?? null;
+
+        if ($value === null) {
+            return $default;
+        }
+
+        return (int) $value;
+    }
+
+    private function getNumericValue(array $fields, string $field): float|int
+    {
+        $value = $fields[$field]['doubleValue'] ?? $fields[$field]['integerValue'] ?? null;
+
+        if ($value === null) {
+            return 0;
+        }
+
+        return is_string($value) ? (float) $value : $value;
     }
 
     /**

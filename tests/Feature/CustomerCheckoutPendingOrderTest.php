@@ -47,7 +47,7 @@ class CustomerCheckoutPendingOrderTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect();
+        $response->assertRedirect('/');
         $this->assertDatabaseHas('orders', [
             'customer_name' => 'Budi',
             'table_number' => 'A1',
@@ -62,4 +62,5 @@ class CustomerCheckoutPendingOrderTest extends TestCase
             'qty' => 2,
         ]);
     }
+
 }

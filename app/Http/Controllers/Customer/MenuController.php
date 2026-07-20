@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
+use App\Services\FirebaseProductSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -16,8 +17,11 @@ class MenuController extends Controller
      */
     public function index(Request $request): View
     {
-        // Sync from Firebase is now handled by background scheduler
-        // No need to sync on every page load
+        try {
+            app(FirebaseProductSyncService::class)->sync();
+        } catch (\Throwable $e) {
+            \Log::warning('Firebase sync skipped during menu render', ['error' => $e->getMessage()]);
+        }
 
         $categories = Category::query()
             ->active()
@@ -49,6 +53,12 @@ class MenuController extends Controller
      */
     public function filter(Request $request): JsonResponse
     {
+        try {
+            app(FirebaseProductSyncService::class)->sync();
+        } catch (\Throwable $e) {
+            \Log::warning('Firebase sync skipped during menu filter', ['error' => $e->getMessage()]);
+        }
+
         $products = $this->filteredProducts($request)
             ->paginate(12);
 

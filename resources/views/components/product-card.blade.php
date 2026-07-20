@@ -15,9 +15,14 @@
         <p class="product-card-desc">{{ $product->description }}</p>
 
         <div class="product-card-footer">
-            <span class="product-card-price">
-                Rp {{ number_format($product->final_price, 0, ',', '.') }}
-            </span>
+            <div>
+                <span class="product-card-price">
+                    Rp {{ number_format($product->final_price, 0, ',', '.') }}
+                </span>
+                <div class="product-card-stock">
+                    Stok: {{ $product->stock ?? 0 }}
+                </div>
+            </div>
 
             <button type="button"
                     class="product-card-add-btn"

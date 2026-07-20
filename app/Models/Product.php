@@ -19,6 +19,7 @@ class Product extends Model
         'price',
         'promo_price',
         'image',
+        'stock',
         'is_promo',
         'is_active',
         'sort_order',
@@ -29,6 +30,7 @@ class Product extends Model
         'is_promo'  => 'boolean',
         'is_active' => 'boolean',
         'price'     => 'integer',
+        'stock'     => 'integer',
         'promo_price' => 'integer',
     ];
 

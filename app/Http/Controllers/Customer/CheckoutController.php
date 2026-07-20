@@ -77,8 +77,7 @@ class CheckoutController extends Controller
 
             session(['clear_cart' => true]);
 
-            return redirect()
-                ->route('home')
+            return redirect('/')
                 ->with('success', 'Pesanan berhasil dikirim!');
         } catch (\Exception $e) {
             \DB::rollBack();
@@ -147,8 +146,7 @@ class CheckoutController extends Controller
 
             \DB::commit();
 
-            return redirect()
-                ->route('home')
+            return redirect('/')
                 ->with('success', 'Pesanan berhasil dibatalkan.');
 
         } catch (\Exception $e) {
