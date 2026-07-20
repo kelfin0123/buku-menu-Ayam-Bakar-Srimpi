@@ -2,9 +2,12 @@
     <div class="cart-card">
         <div class="cart-header">
             <h2>Pesanan Anda</h2>
-            <button type="button" id="cartClearBtn" class="cart-clear-btn" aria-label="Hapus semua pesanan">
-                @include('components.icons.trash')
-            </button>
+            <div class="cart-header-actions">
+                <button type="button" id="cartClearBtn" class="cart-clear-btn" aria-label="Hapus semua pesanan">
+                    @include('components.icons.trash')
+                </button>
+                <button type="button" id="cartCloseBtn" class="cart-close-btn" aria-label="Tutup keranjang">&times;</button>
+            </div>
         </div>
 
         <div class="cart-items" id="cartItems">

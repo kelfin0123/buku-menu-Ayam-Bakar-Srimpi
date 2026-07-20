@@ -71,7 +71,9 @@ function showCartNotification(message) {
     notification.style.cssText = `
         position: fixed;
         top: 20px;
-        right: 20px;
+        right: max(20px, env(safe-area-inset-right));
+        width: max-content;
+        max-width: calc(100vw - 40px);
         background: #fef3c7;
         color: #92400e;
         padding: 12px 20px;
@@ -275,7 +277,9 @@ export function initCart() {
     });
 
     document.getElementById('viewOrdersBtn')?.addEventListener('click', () => {
-        document.getElementById('cartPanel')?.scrollIntoView({ behavior: 'smooth' });
+        if (window.matchMedia('(min-width: 1025px)').matches) {
+            document.getElementById('cartPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     });
 }
 

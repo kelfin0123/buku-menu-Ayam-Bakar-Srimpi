@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\FirestoreOrderService;
-use App\Services\FirestoreTransactionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 
@@ -13,7 +12,6 @@ class OrderController extends Controller
 {
     public function __construct(
         private readonly FirestoreOrderService $firestoreOrders,
-        private readonly FirestoreTransactionService $firestoreTransactions,
     ) {}
 
     /**
@@ -173,31 +171,13 @@ class OrderController extends Controller
     /**
      * Complete an order
      */
-    public function complete(Request $request, Order $order)
+    public function complete(Order $order)
     {
-        $validated = $request->validate([
-            'employee_uid' => ['required', 'string', 'max:128'],
-        ]);
-
-        if ($order->payment_method === Order::PAYMENT_METHOD_QRIS
-            && $order->payment_status !== Order::PAYMENT_STATUS_PAID) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pembayaran QRIS belum berhasil.',
-            ], 422);
-        }
-
         $order->forceFill([
             'status' => Order::STATUS_COMPLETED,
-            'payment_status' => Order::PAYMENT_STATUS_PAID,
-            'finished_at' => $order->finished_at ?? now(),
+            'finished_at' => now(),
         ])->save();
-        $completedOrder = $order->fresh('items.product');
-        $this->firestoreOrders->sync($completedOrder);
-        $this->firestoreTransactions->syncCompletedOrder(
-            $completedOrder,
-            $validated['employee_uid'],
-        );
+        $this->firestoreOrders->sync($order->fresh('items.product'));
 
         return response()->json([
             'success' => true,

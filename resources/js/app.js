@@ -32,8 +32,57 @@ function initDarkMode() {
     applyIcon();
 }
 
+function initMobileDrawers() {
+    const sidebar = document.getElementById('siteSidebar');
+    const sidebarOpen = document.getElementById('sidebarOpenBtn');
+    const sidebarClose = document.getElementById('sidebarCloseBtn');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    const cart = document.getElementById('cartPanel');
+    const cartOpen = document.getElementById('viewOrdersBtn');
+    const cartClose = document.getElementById('cartCloseBtn');
+
+    const syncBodyLock = () => {
+        const open = sidebar?.classList.contains('is-open') || cart?.classList.contains('is-open');
+        document.body.classList.toggle('drawer-open', Boolean(open));
+        backdrop?.classList.toggle('is-visible', Boolean(open));
+    };
+
+    const closeAll = () => {
+        sidebar?.classList.remove('is-open');
+        cart?.classList.remove('is-open');
+        sidebarOpen?.setAttribute('aria-expanded', 'false');
+        syncBodyLock();
+    };
+
+    sidebarOpen?.addEventListener('click', () => {
+        cart?.classList.remove('is-open');
+        sidebar?.classList.add('is-open');
+        sidebarOpen.setAttribute('aria-expanded', 'true');
+        syncBodyLock();
+    });
+    sidebarClose?.addEventListener('click', closeAll);
+    backdrop?.addEventListener('click', closeAll);
+    sidebar?.querySelectorAll('a').forEach(link => link.addEventListener('click', closeAll));
+
+    cartOpen?.addEventListener('click', () => {
+        if (!window.matchMedia('(max-width: 1024px)').matches) return;
+        sidebar?.classList.remove('is-open');
+        cart?.classList.add('is-open');
+        syncBodyLock();
+    });
+    cartClose?.addEventListener('click', closeAll);
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeAll();
+    });
+    window.matchMedia('(min-width: 1025px)').addEventListener('change', event => {
+        if (event.matches) closeAll();
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initDarkMode();
+    initMobileDrawers();
     initHeroSlider();
     initMenuFilter();
     initCart();

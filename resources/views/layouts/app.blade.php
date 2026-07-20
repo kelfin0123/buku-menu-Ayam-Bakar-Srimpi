@@ -24,6 +24,18 @@
 </head>
 <body class="bg-app text-base font-sans antialiased">
 
+    <header class="mobile-header">
+        <button type="button" id="sidebarOpenBtn" class="mobile-menu-btn" aria-controls="siteSidebar" aria-expanded="false" aria-label="Buka menu navigasi">
+            <span></span><span></span><span></span>
+        </button>
+        <a href="{{ route('home') }}" class="mobile-brand">
+            <span aria-hidden="true">🔥</span>
+            <span>Ayam Bakar <strong>Srimpi</strong></span>
+        </a>
+    </header>
+
+    <button type="button" id="sidebarBackdrop" class="drawer-backdrop" aria-label="Tutup menu navigasi" tabindex="-1"></button>
+
     <div class="app-shell">
         {{-- Sidebar kiri --}}
         <x-sidebar />

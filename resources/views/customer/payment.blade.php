@@ -306,13 +306,17 @@
 
     <style>
         .payment-wrap {
+            width: 100%;
             max-width: 600px;
             margin: 0 auto;
-            padding: 1rem;
+            padding: 0;
         }
         
         .payment-card {
-            background: white;
+            width: 100%;
+            min-width: 0;
+            background: var(--color-card);
+            color: var(--color-text);
             border-radius: 1rem;
             padding: 2rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -326,13 +330,14 @@
         .payment-header h2 {
             font-size: 1.5rem;
             font-weight: 600;
-            color: #1f2937;
+            color: var(--color-text);
             margin-bottom: 0.5rem;
         }
         
         .order-code {
             color: #6b7280;
             font-size: 0.875rem;
+            overflow-wrap: anywhere;
         }
         
         .payment-amount {
@@ -364,6 +369,13 @@
             justify-content: space-between;
             padding: 0.75rem 0;
             border-bottom: 1px solid #e5e7eb;
+            gap: 1rem;
+        }
+
+        .info-row span:last-child {
+            min-width: 0;
+            text-align: right;
+            overflow-wrap: anywhere;
         }
         
         .info-row:last-child {
@@ -382,6 +394,12 @@
             justify-content: center;
             background: #f9fafb;
             border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .qris-qr iframe,
+        .qris-qr img {
+            max-width: 100%;
         }
         
         .countdown-container {
@@ -449,6 +467,17 @@
             justify-content: space-between;
             padding: 0.5rem 0;
             border-bottom: 1px solid #e5e7eb;
+            gap: 1rem;
+        }
+
+        .order-item-row span:first-child {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .order-item-row span:last-child {
+            flex: 0 0 auto;
+            text-align: right;
         }
         
         .order-item-row:last-child {
@@ -500,6 +529,19 @@
             text-align: center;
             padding: 2rem;
             color: #6b7280;
+        }
+
+        @media (max-width: 640px) {
+            .payment-card { padding: 1rem; border-radius: 1rem; }
+            .payment-header, .payment-amount, .payment-info, .qris-container, .countdown-container { margin-bottom: 1.25rem; }
+            .payment-header h2 { font-size: 1.25rem; }
+            .payment-amount { padding: 1rem .75rem; }
+            .amount-value { font-size: clamp(1.45rem, 8vw, 2rem); overflow-wrap: anywhere; }
+            .countdown-timer { font-size: 2rem; }
+            .qris-qr { min-height: 160px; }
+            .payment-status { align-items: flex-start; text-align: left; }
+            .success-icon, .expired-icon, .error-icon { font-size: 3rem; }
+            .btn-primary { display: block; width: 100%; padding-inline: 1rem; text-align: center; }
         }
     </style>
 @endsection

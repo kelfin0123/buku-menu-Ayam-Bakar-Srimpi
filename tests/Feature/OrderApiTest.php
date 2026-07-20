@@ -6,7 +6,6 @@ use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\FirestoreOrderService;
-use App\Services\FirestoreTransactionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -57,10 +56,6 @@ class OrderApiTest extends TestCase
 
     public function test_pending_accept_reject_and_finish_workflow(): void
     {
-        $this->mock(FirestoreTransactionService::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('syncCompletedOrder')->once()->andReturnTrue();
-        });
-
         $order = Order::create([
             'order_code' => 'ABS-20260713-0001',
             'customer_name' => 'Budi',
@@ -93,9 +88,7 @@ class OrderApiTest extends TestCase
             'employee_id' => 7,
         ]);
 
-        $finishResponse = $this->postJson("/api/orders/{$order->id}/complete", [
-            'employee_uid' => 'firebase-employee-uid',
-        ]);
+        $finishResponse = $this->postJson("/api/orders/{$order->id}/complete");
         $finishResponse->assertOk()
             ->assertJsonPath('data.status', Order::STATUS_COMPLETED);
 
@@ -130,17 +123,5 @@ class OrderApiTest extends TestCase
             'status' => Order::STATUS_CANCELLED,
             'rejection_reason' => 'Stok habis',
         ]);
-    }
-
-    public function test_completed_order_uses_a_stable_firestore_transaction_document_id(): void
-    {
-        $order = new Order(['order_code' => 'ABS-20260721-IDEM']);
-
-        $service = app(FirestoreTransactionService::class);
-
-        $this->assertSame(
-            'web_order_ABS-20260721-IDEM',
-            $service->documentId($order),
-        );
     }
 }

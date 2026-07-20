@@ -9,8 +9,9 @@
     ];
 @endphp
 
-<aside class="sidebar">
+<aside class="sidebar" id="siteSidebar" aria-label="Navigasi utama">
     <div class="sidebar-top">
+        <button type="button" id="sidebarCloseBtn" class="sidebar-close-btn" aria-label="Tutup menu navigasi">&times;</button>
         {{-- Logo --}}
         <a href="{{ route('home') }}" class="sidebar-logo">
             <span class="sidebar-logo-icon">🔥</span>
