@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\OrderProductResolver;
+use App\Services\FirestoreOrderService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CheckoutController extends Controller
 {
-    public function __construct(private readonly OrderProductResolver $productResolver) {}
+    public function __construct(
+        private readonly OrderProductResolver $productResolver,
+        private readonly FirestoreOrderService $firestoreOrders,
+    ) {}
 
     /**
      * Tampilkan halaman checkout. Data keranjang dikirim dari localStorage (JS)
@@ -71,9 +75,10 @@ class CheckoutController extends Controller
                 'subtotal' => $subtotal,
                 'shipping_cost' => 0,
                 'total' => $subtotal,
-                'payment_method' => 'cash',
-                'payment_status' => 'pending',
-                'status' => 'pending',
+                'payment_method' => null,
+                'payment_status' => Order::PAYMENT_STATUS_PENDING,
+                'status' => Order::STATUS_WAITING_PAYMENT,
+                'expires_at' => now()->addMinutes(15),
             ]);
 
             foreach ($itemsData as $data) {
@@ -81,6 +86,8 @@ class CheckoutController extends Controller
             }
 
             \DB::commit();
+
+            $this->firestoreOrders->sync($order->fresh('items.product'));
 
             session(['clear_cart' => true]);
 
@@ -93,6 +100,31 @@ class CheckoutController extends Controller
                 ->withInput()
                 ->withErrors(['error' => 'Terjadi kesalahan saat membuat pesanan. Silakan coba lagi.']);
         }
+    }
+
+    public function selectPayment(Request $request, string $orderCode): RedirectResponse
+    {
+        $validated = $request->validate([
+            'payment_method' => ['required', 'in:cash,qris'],
+        ]);
+        $order = Order::where('order_code', $orderCode)->firstOrFail();
+
+        if (in_array($order->status, [Order::STATUS_CANCELLED, Order::STATUS_EXPIRED], true)) {
+            return back()->withErrors(['payment_method' => 'Pesanan tidak dapat dibayar.']);
+        }
+
+        $method = $validated['payment_method'];
+        $order->update([
+            'payment_method' => $method,
+            'payment_status' => Order::PAYMENT_STATUS_PENDING,
+            'status' => $method === Order::PAYMENT_METHOD_CASH
+                ? Order::STATUS_NEW_ORDER
+                : Order::STATUS_WAITING_PAYMENT,
+            'expires_at' => now()->addMinutes($method === Order::PAYMENT_METHOD_CASH ? 60 : 15),
+        ]);
+        $this->firestoreOrders->sync($order->fresh('items.product'));
+
+        return redirect()->route('checkout.payment', $order->order_code);
     }
 
     /**

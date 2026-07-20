@@ -93,8 +93,16 @@ class Order extends Model
     /** Scope for incoming orders (new orders waiting for acceptance) */
     public function scopeIncoming($query)
     {
-        return $query->whereIn('status', [self::STATUS_NEW_ORDER, self::STATUS_WAITING_PAYMENT])
-            ->where('payment_status', self::PAYMENT_STATUS_PAID)
+        return $query->where(function ($query) {
+            $query->where(function ($paid) {
+                $paid->whereIn('status', [self::STATUS_NEW_ORDER, self::STATUS_WAITING_PAYMENT])
+                    ->where('payment_status', self::PAYMENT_STATUS_PAID);
+            })->orWhere(function ($cash) {
+                $cash->where('status', self::STATUS_NEW_ORDER)
+                    ->where('payment_method', self::PAYMENT_METHOD_CASH)
+                    ->where('payment_status', self::PAYMENT_STATUS_PENDING);
+            });
+        })
             ->orderByDesc('created_at');
     }
 

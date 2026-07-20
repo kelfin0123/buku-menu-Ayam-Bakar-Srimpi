@@ -61,6 +61,9 @@ Route::prefix('checkout')->name('checkout.')->group(function () {
     // Simpan Pesanan
     Route::post('/', [CheckoutController::class, 'store'])->name('store');
 
+    Route::post('/{orderCode}/payment', [CheckoutController::class, 'selectPayment'])
+        ->name('payment.select');
+
     // Halaman Pembayaran
     Route::get('/payment/{orderCode}', [CheckoutController::class, 'payment'])->name('payment');
 

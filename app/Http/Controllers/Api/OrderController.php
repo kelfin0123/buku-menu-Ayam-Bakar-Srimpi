@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Services\FirestoreOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 
 class OrderController extends Controller
 {
+    public function __construct(private readonly FirestoreOrderService $firestoreOrders) {}
+
     /**
      * Get order by order_code
      */
@@ -78,12 +81,16 @@ class OrderController extends Controller
 
         $order->forceFill([
             'status' => Order::STATUS_PROCESSING,
+            'payment_status' => $order->payment_method === Order::PAYMENT_METHOD_CASH
+                ? Order::PAYMENT_STATUS_PAID
+                : $order->payment_status,
             'employee_id' => Arr::get($validated, 'employee_id') ?? $request->user()?->id,
             'accepted_at' => now(),
             'finished_at' => null,
             'rejected_at' => null,
             'rejection_reason' => null,
         ])->save();
+        $this->firestoreOrders->sync($order->fresh('items.product'));
 
         return response()->json([
             'success' => true,
@@ -110,6 +117,7 @@ class OrderController extends Controller
             'accepted_at' => $order->accepted_at,
             'rejection_reason' => Arr::get($validated, 'rejection_reason') ?? 'Tidak ada alasan.',
         ])->save();
+        $this->firestoreOrders->sync($order->fresh('items.product'));
 
         // Restore stock
         foreach ($order->items as $item) {
@@ -156,6 +164,7 @@ class OrderController extends Controller
         $order->forceFill([
             'status' => Order::STATUS_READY,
         ])->save();
+        $this->firestoreOrders->sync($order->fresh('items.product'));
 
         return response()->json([
             'success' => true,
@@ -173,6 +182,7 @@ class OrderController extends Controller
             'status' => Order::STATUS_COMPLETED,
             'finished_at' => now(),
         ])->save();
+        $this->firestoreOrders->sync($order->fresh('items.product'));
 
         return response()->json([
             'success' => true,

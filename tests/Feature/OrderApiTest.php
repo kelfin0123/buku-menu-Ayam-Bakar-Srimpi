@@ -21,10 +21,11 @@ class OrderApiTest extends TestCase
             'shipping_cost' => 5000,
             'total' => 25000,
             'payment_status' => 'pending',
-            'status' => 'menunggu_konfirmasi',
+            'payment_method' => 'cash',
+            'status' => Order::STATUS_NEW_ORDER,
         ]);
 
-        $response = $this->getJson('/api/orders/pending');
+        $response = $this->getJson('/api/orders/incoming');
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonFragment(['id' => $order->id]);
@@ -35,21 +36,21 @@ class OrderApiTest extends TestCase
 
         $acceptResponse->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.status', 'diproses');
+            ->assertJsonPath('data.status', Order::STATUS_PROCESSING);
 
         $this->assertDatabaseHas('orders', [
             'id' => $order->id,
-            'status' => 'diproses',
+            'status' => Order::STATUS_PROCESSING,
             'employee_id' => 7,
         ]);
 
-        $finishResponse = $this->postJson("/api/orders/{$order->id}/finish");
+        $finishResponse = $this->postJson("/api/orders/{$order->id}/complete");
         $finishResponse->assertOk()
-            ->assertJsonPath('data.status', 'selesai');
+            ->assertJsonPath('data.status', Order::STATUS_COMPLETED);
 
         $this->assertDatabaseHas('orders', [
             'id' => $order->id,
-            'status' => 'selesai',
+            'status' => Order::STATUS_COMPLETED,
         ]);
 
         $rejectedOrder = Order::create([
@@ -61,7 +62,8 @@ class OrderApiTest extends TestCase
             'shipping_cost' => 5000,
             'total' => 15000,
             'payment_status' => 'pending',
-            'status' => 'menunggu_konfirmasi',
+            'payment_method' => 'cash',
+            'status' => Order::STATUS_NEW_ORDER,
         ]);
 
         $rejectResponse = $this->postJson("/api/orders/{$rejectedOrder->id}/reject", [
@@ -70,11 +72,11 @@ class OrderApiTest extends TestCase
         ]);
 
         $rejectResponse->assertOk()
-            ->assertJsonPath('data.status', 'ditolak');
+            ->assertJsonPath('data.status', Order::STATUS_CANCELLED);
 
         $this->assertDatabaseHas('orders', [
             'id' => $rejectedOrder->id,
-            'status' => 'ditolak',
+            'status' => Order::STATUS_CANCELLED,
             'rejection_reason' => 'Stok habis',
         ]);
     }

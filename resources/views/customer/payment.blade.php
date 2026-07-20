@@ -187,7 +187,7 @@
         function loadMidtransSnap(snapToken) {
             const script = document.createElement('script');
             script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
-            script.setAttribute('data-client-key', 'SB-Mid-client-TEST');
+            script.setAttribute('data-client-key', @json(config('midtrans.client_key')));
             script.onload = () => {
                 window.snap.pay(snapToken, {
                     onSuccess: function(result) {

@@ -52,7 +52,7 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         $this->assertDatabaseHas('orders', [
             'customer_name' => 'Budi',
             'table_number' => 'A1',
-            'status' => 'pending',
+            'status' => 'waiting_payment',
             'payment_status' => 'pending',
         ]);
 
@@ -97,6 +97,36 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         $response->assertRedirect(route('order.show', $order->order_code));
         $this->assertDatabaseHas('products', ['firestore_id' => 'firebase-1']);
         $this->assertDatabaseHas('order_items', ['order_id' => $order->id, 'qty' => 1]);
+    }
+
+    public function test_customer_can_choose_cash_and_order_becomes_incoming(): void
+    {
+        $order = Order::create([
+            'order_code' => 'ABS-20260720-PAY01',
+            'customer_name' => 'Dina',
+            'customer_phone' => '',
+            'table_number' => 'C3',
+            'subtotal' => 10000,
+            'shipping_cost' => 0,
+            'total' => 10000,
+            'payment_status' => Order::PAYMENT_STATUS_PENDING,
+            'status' => Order::STATUS_WAITING_PAYMENT,
+        ]);
+
+        $this->get(route('order.show', $order->order_code))
+            ->assertOk()->assertSee('Bayar Tunai')->assertSee('Bayar QRIS');
+
+        $this->post(route('checkout.payment.select', $order->order_code), [
+            'payment_method' => 'cash',
+        ])->assertRedirect(route('checkout.payment', $order->order_code));
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'payment_method' => 'cash',
+            'status' => Order::STATUS_NEW_ORDER,
+        ]);
+        $this->getJson('/api/orders/incoming')->assertOk()
+            ->assertJsonFragment(['order_code' => $order->order_code]);
     }
 
 }

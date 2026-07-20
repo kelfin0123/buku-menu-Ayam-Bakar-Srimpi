@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\MidtransService;
+use App\Services\FirestoreOrderService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -12,7 +13,10 @@ class PaymentController extends Controller
 {
     private MidtransService $midtransService;
 
-    public function __construct(MidtransService $midtransService)
+    public function __construct(
+        MidtransService $midtransService,
+        private readonly FirestoreOrderService $firestoreOrders,
+    )
     {
         $this->midtransService = $midtransService;
     }
@@ -87,6 +91,7 @@ class PaymentController extends Controller
         try {
             $notification = $request->all();
             $order = $this->midtransService->handleNotification($notification);
+            $this->firestoreOrders->sync($order->fresh('items.product'));
 
             return response()->json([
                 'success' => true,
@@ -129,6 +134,7 @@ class PaymentController extends Controller
             'payment_status' => Order::PAYMENT_STATUS_PAID,
             'status' => Order::STATUS_NEW_ORDER,
         ]);
+        $this->firestoreOrders->sync($order->fresh('items.product'));
 
         return response()->json([
             'success' => true,
