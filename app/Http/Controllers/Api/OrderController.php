@@ -119,13 +119,6 @@ class OrderController extends Controller
         ])->save();
         $this->firestoreOrders->sync($order->fresh('items.product'));
 
-        // Restore stock
-        foreach ($order->items as $item) {
-            if ($item->product) {
-                $item->product->increment('stock', $item->qty);
-            }
-        }
-
         return response()->json([
             'success' => true,
             'message' => 'Pesanan ditolak.',
@@ -233,6 +226,7 @@ class OrderController extends Controller
             'finished_at' => $order->finished_at?->toISOString(),
             'rejected_at' => $order->rejected_at?->toISOString(),
             'rejection_reason' => $order->rejection_reason,
+            'expires_at' => $order->expires_at?->toISOString(),
             'created_at' => $order->created_at?->toISOString(),
             'items' => $order->items->map(function ($item) {
                 return [

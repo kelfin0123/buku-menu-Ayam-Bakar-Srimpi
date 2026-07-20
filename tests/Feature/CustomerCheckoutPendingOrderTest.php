@@ -57,6 +57,10 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         ]);
 
         $order = Order::where('customer_name', 'Budi')->firstOrFail();
+        $this->assertNotNull($order->expires_at);
+        $this->getJson("/api/orders/code/{$order->order_code}")
+            ->assertOk()
+            ->assertJsonPath('data.expires_at', $order->expires_at->toISOString());
         $this->assertDatabaseHas('order_items', [
             'order_id' => $order->id,
             'product_id' => $product->id,

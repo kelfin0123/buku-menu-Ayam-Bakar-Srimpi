@@ -82,12 +82,9 @@ class Order extends Model
         $this->payment_status = self::PAYMENT_STATUS_FAILED;
         $this->save();
 
-        // Restore stock
-        foreach ($this->items as $item) {
-            if ($item->product) {
-                $item->product->increment('stock', $item->qty);
-            }
-        }
+        // Stock produk web bersumber dari Firestore dan tidak pernah dikurangi
+        // di tabel SQL ketika checkout, sehingga tidak ada stok SQL yang perlu
+        // dikembalikan di sini.
     }
 
     /** Scope for incoming orders (new orders waiting for acceptance) */

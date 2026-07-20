@@ -85,15 +85,12 @@ class MidtransService
         } else if ($transactionStatus == 'cancel') {
             $order->payment_status = Order::PAYMENT_STATUS_FAILED;
             $order->status = Order::STATUS_CANCELLED;
-            $this->restoreStock($order);
         } else if ($transactionStatus == 'deny') {
             $order->payment_status = Order::PAYMENT_STATUS_FAILED;
             $order->status = Order::STATUS_CANCELLED;
-            $this->restoreStock($order);
         } else if ($transactionStatus == 'expire') {
             $order->payment_status = Order::PAYMENT_STATUS_FAILED;
             $order->status = Order::STATUS_EXPIRED;
-            $this->restoreStock($order);
         } else if ($transactionStatus == 'pending') {
             $order->payment_status = Order::PAYMENT_STATUS_PENDING;
         }
@@ -103,15 +100,4 @@ class MidtransService
         return $order;
     }
 
-    /**
-     * Restore stock when order is cancelled or expired
-     */
-    private function restoreStock(Order $order): void
-    {
-        foreach ($order->items as $item) {
-            if ($item->product) {
-                $item->product->increment('stock', $item->qty);
-            }
-        }
-    }
 }

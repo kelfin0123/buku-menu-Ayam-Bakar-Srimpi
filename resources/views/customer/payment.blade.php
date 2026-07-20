@@ -208,8 +208,14 @@
         function startCountdown(expiresAt) {
             const countdownElement = document.getElementById('countdown');
             if (!countdownElement) return;
-            
+
             const expiryTime = new Date(expiresAt).getTime();
+
+            if (!expiresAt || Number.isNaN(expiryTime)) {
+                countdownElement.textContent = '--:--';
+                console.error('Invalid payment expiration time', { expiresAt });
+                return;
+            }
             
             const interval = setInterval(() => {
                 const now = new Date().getTime();

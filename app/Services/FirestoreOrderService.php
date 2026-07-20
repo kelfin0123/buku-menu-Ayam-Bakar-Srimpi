@@ -12,6 +12,13 @@ class FirestoreOrderService
 {
     public function sync(Order $order): bool
     {
+        Log::info('Firestore order synchronization started', [
+            'order_id' => $order->id,
+            'order_code' => $order->order_code,
+            'project_id' => config('firebase.project_id'),
+            'collection' => 'orders',
+        ]);
+
         try {
             $order->loadMissing('items.product');
             $projectId = (string) config('firebase.project_id');
@@ -41,6 +48,7 @@ class FirestoreOrderService
                 'order_id' => $order->id,
                 'order_code' => $order->order_code,
                 'status' => $order->status,
+                'collection' => 'orders',
             ]);
             return true;
         } catch (\Throwable $e) {
