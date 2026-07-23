@@ -62,6 +62,144 @@ class FirestoreOrderService
         }
     }
 
+    /**
+     * Atomically synchronize the completed order, its financial transaction,
+     * and its activity log. Deterministic document IDs make this operation
+     * idempotent when the mobile client retries the complete request.
+     */
+    public function syncCompletion(Order $order, array $actor = []): bool
+    {
+        Log::info('Firestore order completion synchronization started', [
+            'order_id' => $order->id,
+            'order_code' => $order->order_code,
+        ]);
+
+        try {
+            $order->loadMissing('items.product');
+            $projectId = (string) config('firebase.project_id');
+            $credentials = $this->credentials($projectId);
+            if ($credentials === null) {
+                throw new RuntimeException('Firebase service account wajib dikonfigurasi untuk menyelesaikan order.');
+            }
+
+            $token = (new ServiceAccountCredentials(
+                ['https://www.googleapis.com/auth/datastore'],
+                $credentials,
+            ))->fetchAuthToken()['access_token'] ?? null;
+            if (!$token) {
+                throw new RuntimeException('Gagal memperoleh access token Firebase.');
+            }
+
+            $database = sprintf(
+                'projects/%s/databases/(default)',
+                $projectId,
+            );
+            $transactionId = 'web-order-' . $order->id;
+            $activityId = 'complete-web-order-' . $order->id;
+            $completedAt = $order->finished_at ?? now();
+            $employeeUid = (string) ($actor['employee_uid'] ?? '');
+            $employeeName = (string) ($actor['employee_name'] ?? 'Employee');
+
+            $transaction = [
+                'orderId' => (string) $order->id,
+                'orderCode' => $order->order_code,
+                'transactionId' => $transactionId,
+                'source' => 'web',
+                'userId' => $employeeUid,
+                'employeeId' => $employeeUid,
+                'employeeSqlId' => $order->employee_id,
+                'cashierName' => $employeeName,
+                'ownerId' => $actor['owner_id'] ?? null,
+                'branchId' => $actor['branch_id'] ?? null,
+                'customerName' => $order->customer_name,
+                'customerPhone' => $order->customer_phone,
+                'customerAddress' => $order->customer_address,
+                'tableNumber' => $order->table_number,
+                'transactionType' => 'sale',
+                'type' => 'income',
+                'description' => 'Pesanan web ' . $order->order_code,
+                'paymentMethod' => $order->payment_method,
+                'paymentStatus' => $order->payment_status === Order::PAYMENT_STATUS_PENDING
+                    ? 'unpaid'
+                    : $order->payment_status,
+                'status' => 'completed',
+                'subtotal' => (int) $order->subtotal,
+                'tax' => 0,
+                'discount' => 0,
+                'shippingCost' => (int) $order->shipping_cost,
+                'grandTotal' => (int) $order->total,
+                'amount' => (int) $order->total,
+                'totalHPP' => 0,
+                'grossProfit' => (int) $order->total,
+                'netProfit' => (int) $order->total,
+                'items' => $order->items->map(fn ($item) => [
+                    'productId' => $item->product?->firestore_id ?? (string) $item->product_id,
+                    'productName' => $item->product_name,
+                    'name' => $item->product_name,
+                    'price' => (int) $item->price,
+                    'quantity' => (int) $item->qty,
+                    'subtotal' => (int) $item->subtotal,
+                    'costPrice' => 0,
+                    'category' => $item->product?->category_id,
+                ])->values()->all(),
+                'createdAt' => $completedAt,
+                'completedAt' => $completedAt,
+                'updatedAt' => now(),
+            ];
+
+            $activity = [
+                'userId' => $employeeUid,
+                'action' => 'complete_order',
+                'description' => 'Pesanan ' . $order->order_code . ' diselesaikan',
+                'metadata' => [
+                    'orderId' => (string) $order->id,
+                    'orderCode' => $order->order_code,
+                    'transactionId' => $transactionId,
+                    'source' => 'web',
+                    'amount' => (int) $order->total,
+                ],
+                'createdAt' => $completedAt,
+            ];
+
+            $document = fn (string $collection, string $id, array $fields) => [
+                'update' => [
+                    'name' => "{$database}/documents/{$collection}/{$id}",
+                    'fields' => $this->encodeMap($fields),
+                ],
+            ];
+
+            Http::acceptJson()->withToken($token)->timeout(20)->retry(2, 250)
+                ->post(
+                    "https://firestore.googleapis.com/v1/{$database}/documents:commit",
+                    [
+                        'writes' => [
+                            $document('orders', $order->order_code, $this->payload($order)),
+                            $document('transactions', $transactionId, $transaction),
+                            $document('activity_logs', $activityId, $activity),
+                        ],
+                    ],
+                )
+                ->throw();
+
+            Log::info('Firestore order completion synchronized', [
+                'order_id' => $order->id,
+                'transaction_id' => $transactionId,
+                'activity_id' => $activityId,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Failed synchronizing Firestore order completion', [
+                'order_id' => $order->id,
+                'order_code' => $order->order_code,
+                'message' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
+
+            return false;
+        }
+    }
+
     private function payload(Order $order): array
     {
         return [
@@ -69,6 +207,8 @@ class FirestoreOrderService
             'sqlId' => $order->id,
             'orderCode' => $order->order_code,
             'customerName' => $order->customer_name,
+            'customerPhone' => $order->customer_phone,
+            'customerAddress' => $order->customer_address,
             'tableNumber' => $order->table_number,
             'source' => 'web',
             'status' => $order->status,

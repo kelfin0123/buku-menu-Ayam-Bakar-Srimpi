@@ -171,13 +171,31 @@ class OrderController extends Controller
     /**
      * Complete an order
      */
-    public function complete(Order $order)
+    public function complete(Request $request, Order $order)
     {
+        $actor = $request->validate([
+            'employee_uid' => 'required|string|max:128',
+            'employee_name' => 'nullable|string|max:255',
+            'owner_id' => 'nullable|string|max:128',
+            'branch_id' => 'nullable|string|max:128',
+        ]);
+
         $order->forceFill([
             'status' => Order::STATUS_COMPLETED,
-            'finished_at' => now(),
+            'payment_status' => $order->payment_method === Order::PAYMENT_METHOD_CASH
+                ? Order::PAYMENT_STATUS_PAID
+                : $order->payment_status,
+            'finished_at' => $order->finished_at ?? now(),
         ])->save();
-        $this->firestoreOrders->sync($order->fresh('items.product'));
+        $order = $order->fresh('items.product');
+
+        if (! $this->firestoreOrders->syncCompletion($order, $actor)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan sudah selesai, tetapi sinkronisasi transaksi gagal. Silakan tekan Selesai lagi; transaksi tidak akan terduplikasi.',
+                'data' => $this->formatOrder($order),
+            ], 503);
+        }
 
         return response()->json([
             'success' => true,
