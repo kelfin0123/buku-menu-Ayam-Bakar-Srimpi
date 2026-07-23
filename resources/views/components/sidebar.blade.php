@@ -36,14 +36,6 @@
     </div>
 
     <div class="sidebar-bottom">
-        {{-- Banner Gratis Ongkir --}}
-        <div class="sidebar-promo-card">
-            <p class="sidebar-promo-title">Gratis Ongkir</p>
-            <p class="sidebar-promo-desc">Min. belanja<br><span>Rp 30.000</span></p>
-            <img src="{{ asset('images/icons/delivery-scooter.png') }}" alt="" class="sidebar-promo-img" onerror="this.style.display='none'">
-            <a href="{{ route('checkout.index') }}" class="sidebar-promo-btn">Pesan Sekarang</a>
-        </div>
-
         {{-- Mode Gelap --}}
         <button type="button" id="darkModeToggle" class="sidebar-darkmode-btn">
             <span class="sidebar-link-icon" id="darkModeIcon">

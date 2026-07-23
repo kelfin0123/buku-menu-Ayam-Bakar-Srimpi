@@ -5,7 +5,6 @@
  */
 
 const CART_KEY = 'ayam_bakar_srimpi_cart';
-const SHIPPING_COST = 5000;
 
 function getCart() {
     try {
@@ -189,7 +188,6 @@ function renderCart() {
     const emptyState = document.getElementById('cartEmptyState');
     const template = document.getElementById('cartItemTemplate');
     const subtotalEl = document.getElementById('cartSubtotal');
-    const shippingEl = document.getElementById('cartShipping');
     const totalEl = document.getElementById('cartTotal');
     const checkoutBtn = document.getElementById('cartCheckoutBtn');
 
@@ -225,12 +223,8 @@ function renderCart() {
     }
 
     const subtotal = calculateSubtotal(cart);
-    const shipping = cart.length > 0 ? SHIPPING_COST : 0;
-    const total = subtotal + shipping;
-
     if (subtotalEl) subtotalEl.textContent = formatRupiah(subtotal);
-    if (shippingEl) shippingEl.textContent = formatRupiah(shipping);
-    if (totalEl) totalEl.textContent = formatRupiah(total);
+    if (totalEl) totalEl.textContent = formatRupiah(subtotal);
     if (checkoutBtn) checkoutBtn.disabled = cart.length === 0;
 }
 
@@ -284,4 +278,4 @@ export function initCart() {
 }
 
 // Diekspor agar bisa dipakai halaman checkout untuk mengisi ringkasan & hidden input
-export { getCart, calculateSubtotal, formatRupiah, SHIPPING_COST, validateCart, clearCart };
+export { getCart, calculateSubtotal, formatRupiah, validateCart, clearCart };

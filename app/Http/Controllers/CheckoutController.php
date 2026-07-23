@@ -12,17 +12,13 @@ use Illuminate\View\View;
 
 class CheckoutController extends Controller
 {
-    private const SHIPPING_COST = 5000;
-
     /**
      * Tampilkan halaman checkout. Data keranjang dikirim dari localStorage (JS)
      * lalu di-render ulang lewat form tersembunyi / fetch ke endpoint store().
      */
     public function index(): View
     {
-        return view('customer.checkout', [
-            'shippingCost' => self::SHIPPING_COST,
-        ]);
+        return view('customer.checkout');
     }
 
     /**
@@ -64,8 +60,8 @@ class CheckoutController extends Controller
             'customer_phone'    => $validated['customer_phone'],
             'customer_address'  => $validated['customer_address'] ?? null,
             'subtotal'          => $subtotal,
-            'shipping_cost'     => self::SHIPPING_COST,
-            'total'             => $subtotal + self::SHIPPING_COST,
+            'shipping_cost'     => 0,
+            'total'             => $subtotal,
             'payment_status'    => 'pending',
             'status'            => 'waiting',
         ]);

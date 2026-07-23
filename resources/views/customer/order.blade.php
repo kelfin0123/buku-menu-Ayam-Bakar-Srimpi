@@ -26,13 +26,9 @@
                     <span>Subtotal</span>
                     <span>Rp {{ number_format($order->subtotal, 0, ',', '.') }}</span>
                 </div>
-                <div class="cart-summary-row">
-                    <span>Ongkir</span>
-                    <span>Rp {{ number_format($order->shipping_cost, 0, ',', '.') }}</span>
-                </div>
                 <div class="cart-summary-row cart-summary-total">
                     <span>Total</span>
-                    <span>Rp {{ number_format($order->total, 0, ',', '.') }}</span>
+                    <span>Rp {{ number_format($order->subtotal, 0, ',', '.') }}</span>
                 </div>
             </div>
 

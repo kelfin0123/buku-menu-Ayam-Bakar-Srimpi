@@ -52,6 +52,9 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         $this->assertDatabaseHas('orders', [
             'customer_name' => 'Budi',
             'table_number' => 'A1',
+            'subtotal' => 30000,
+            'shipping_cost' => 0,
+            'total' => 30000,
             'status' => 'waiting_payment',
             'payment_status' => 'pending',
         ]);
@@ -118,7 +121,11 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         ]);
 
         $this->get(route('order.show', $order->order_code))
-            ->assertOk()->assertSee('Bayar Tunai')->assertSee('Bayar QRIS');
+            ->assertOk()
+            ->assertDontSee('Ongkir')
+            ->assertSee('Rp 10.000')
+            ->assertSee('Bayar Tunai')
+            ->assertSee('Bayar QRIS');
 
         $this->post(route('checkout.payment.select', $order->order_code), [
             'payment_method' => 'cash',

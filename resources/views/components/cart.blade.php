@@ -20,10 +20,6 @@
                 <span>Subtotal</span>
                 <span id="cartSubtotal">Rp 0</span>
             </div>
-            <div class="cart-summary-row">
-                <span>Ongkir</span>
-                <span id="cartShipping">Rp 0</span>
-            </div>
             <div class="cart-summary-row cart-summary-total">
                 <span>Total</span>
                 <span id="cartTotal">Rp 0</span>
