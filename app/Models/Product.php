@@ -19,6 +19,7 @@ class Product extends Model
         'price',
         'promo_price',
         'image',
+        'image_url',
         'stock',
         'is_promo',
         'is_active',
@@ -27,10 +28,10 @@ class Product extends Model
     ];
 
     protected $casts = [
-        'is_promo'  => 'boolean',
+        'is_promo' => 'boolean',
         'is_active' => 'boolean',
-        'price'     => 'integer',
-        'stock'     => 'integer',
+        'price' => 'integer',
+        'stock' => 'integer',
         'promo_price' => 'integer',
     ];
 
@@ -48,8 +49,12 @@ class Product extends Model
     }
 
     /** Path gambar publik dengan fallback placeholder */
-    public function getImageUrlAttribute(): string
+    public function getImageUrlAttribute(?string $value): string
     {
+        if ($value) {
+            return $value;
+        }
+
         if ($this->image && (str_starts_with($this->image, 'http://') || str_starts_with($this->image, 'https://'))) {
             return $this->image;
         }

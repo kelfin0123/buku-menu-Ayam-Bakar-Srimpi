@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('products', [ProductController::class, 'index']);
 Route::get('products/{product}', [ProductController::class, 'show']);
+Route::post('products/upload', [ProductController::class, 'uploadImage']);
 Route::post('products/upload-image', [ProductController::class, 'uploadImage']);
 Route::post('products', [ProductController::class, 'store']);
 Route::match(['put', 'post'], 'products/{product}', [ProductController::class, 'update']);

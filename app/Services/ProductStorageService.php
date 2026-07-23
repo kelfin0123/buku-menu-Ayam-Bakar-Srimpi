@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 class ProductStorageService
 {
     protected string $disk = 'public';
+
     protected string $directory = 'products';
 
     public function ensureStorageLink(): void
@@ -27,8 +28,17 @@ class ProductStorageService
     {
         $this->ensureStorageLink();
 
-        $ext = $file->getClientOriginalExtension() ?: 'jpg';
-        $filename = Str::uuid()->toString() . '.' . $ext;
+        $extensionByMime = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+        ];
+        $ext = $extensionByMime[$file->getMimeType()] ?? null;
+        if ($ext === null) {
+            throw new \InvalidArgumentException('MIME type gambar tidak didukung.');
+        }
+
+        $filename = Str::uuid()->toString().'_'.now()->timestamp.'.'.$ext;
         Storage::disk($this->disk)->makeDirectory($this->directory);
         $path = $file->storeAs($this->directory, $filename, $this->disk);
 

@@ -2,67 +2,61 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Support\Facades\Http;
+use App\Models\Category;
+use App\Models\Product;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MenuControllerSyncTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
+    use RefreshDatabase;
 
-        config()->set('firebase.project_id', 'test-project');
-        config()->set('firebase.products_collection', 'products');
-        config()->set('firebase.credentials', null);
-        config()->set('firebase.credentials_base64', null);
-        config()->set('firebase.client_email', null);
-        config()->set('firebase.private_key', null);
-    }
-
-    public function test_menu_reads_and_maps_products_directly_from_firestore(): void
+    public function test_menu_reads_products_and_laravel_image_url_from_database(): void
     {
-        Http::fake([
-            'https://firestore.googleapis.com/v1/projects/test-project/databases/(default)/documents/products*' => Http::response([
-                'documents' => [
-                    [
-                        'name' => 'projects/test-project/databases/(default)/documents/products/doc-1',
-                        'fields' => [
-                            'name' => ['stringValue' => 'Nasi Goreng'],
-                            'description' => ['stringValue' => 'Enak dan hangat'],
-                            'category' => ['stringValue' => 'Makanan'],
-                            'price' => ['stringValue' => '20000'],
-                            'stock' => ['integerValue' => '15'],
-                            'image_url' => ['stringValue' => 'https://example.com/nasi.jpg'],
-                            'createdAt' => ['timestampValue' => '2026-07-20T10:00:00Z'],
-                        ],
-                    ],
-                    [
-                        'name' => 'projects/test-project/databases/(default)/documents/products/doc-inactive',
-                        'fields' => [
-                            'name' => ['stringValue' => 'Produk Nonaktif'],
-                            'isActive' => ['booleanValue' => false],
-                        ],
-                    ],
-                ],
-            ]),
+        $category = Category::create([
+            'name' => 'Makanan',
+            'slug' => 'makanan',
+            'sort_order' => 1,
+            'is_active' => true,
         ]);
-
-        $response = $this->get('/');
-
-        $response->assertOk()
-            ->assertSee('Nasi Goreng')
-            ->assertSee('Makanan')
-            ->assertSee('15')
-            ->assertSee('doc-1')
-            ->assertDontSee('Produk Nonaktif');
-    }
-
-    public function test_menu_shows_an_explicit_error_when_firestore_fails(): void
-    {
-        Http::fake(fn () => Http::response(['error' => ['message' => 'Permission denied']], 403));
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'Nasi Goreng',
+            'slug' => 'nasi-goreng',
+            'description' => 'Enak dan hangat',
+            'price' => 20000,
+            'image' => 'products/nasi.jpg',
+            'image_url' => 'https://menu.example/storage/products/nasi.jpg',
+            'firestore_id' => 'doc-1',
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('Produk belum dapat dibaca dari Firebase');
+            ->assertSee('Nasi Goreng')
+            ->assertSee('Makanan')
+            ->assertSee('doc-1')
+            ->assertSee('https://menu.example/storage/products/nasi.jpg');
+    }
+
+    public function test_menu_does_not_show_inactive_database_products(): void
+    {
+        $category = Category::create([
+            'name' => 'Minuman',
+            'slug' => 'minuman',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'Produk Nonaktif',
+            'slug' => 'produk-nonaktif',
+            'price' => 10000,
+            'firestore_id' => 'inactive-doc',
+            'is_active' => false,
+        ]);
+
+        $this->get('/')->assertOk()->assertDontSee('Produk Nonaktif');
     }
 }

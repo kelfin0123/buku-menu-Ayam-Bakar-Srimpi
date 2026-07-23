@@ -24,11 +24,10 @@ class OrderProductResolver
             return $product;
         }
 
-        $source = $this->products()->first(fn (array $item) =>
-            $item['id'] === $firestoreId || $item['id'] === $documentId
+        $source = $this->products()->first(fn (array $item) => $item['id'] === $firestoreId || $item['id'] === $documentId
         );
 
-        if (!$source) {
+        if (! $source) {
             return null;
         }
 
@@ -53,6 +52,7 @@ class OrderProductResolver
                 'description' => $source['description'],
                 'price' => max(0, (int) $source['price']),
                 'image' => $source['imageUrl'],
+                'image_url' => $source['imageUrl'],
                 'is_active' => true,
                 'sort_order' => 1,
             ],

@@ -23,6 +23,7 @@ class ProductUpdateRequest extends FormRequest
             'image' => $this->hasFile('image')
                 ? ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120']
                 : ['nullable', 'url', 'max:2048'],
+            'remove_image' => ['sometimes', 'boolean'],
         ];
     }
 }

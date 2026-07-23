@@ -8,10 +8,11 @@ use App\Http\Requests\Api\ProductUpdateRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Product;
-use App\Services\ProductStorageService;
 use App\Services\OrderProductResolver;
+use App\Services\ProductStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
@@ -21,8 +22,7 @@ class ProductController extends Controller
     public function __construct(
         ProductStorageService $storageService,
         private readonly OrderProductResolver $orderProductResolver,
-    )
-    {
+    ) {
         $this->storageService = $storageService;
     }
 
@@ -59,12 +59,14 @@ class ProductController extends Controller
             return response()->json([
                 'success' => true,
                 'image_url' => $stored['url'],
+                'path' => $stored['path'],
                 'image_path' => $stored['path'],
+                'message' => 'Upload berhasil',
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengunggah gambar: ' . $e->getMessage(),
+                'message' => 'Gagal mengunggah gambar: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -74,7 +76,7 @@ class ProductController extends Controller
         $data = $request->only(['name', 'price', 'description', 'firestore_id', 'is_active', 'is_promo', 'promo_price', 'sort_order']);
 
         $slugBase = Str::slug($data['name']);
-        $data['slug'] = $slugBase . '-' . time();
+        $data['slug'] = $slugBase.'-'.time();
 
         $categoryId = $request->input('category_id');
         if (! $categoryId && $request->filled('category')) {
@@ -90,14 +92,22 @@ class ProductController extends Controller
         }
         $data['category_id'] = $categoryId;
 
-        if ($request->hasFile('image')) {
-            $stored = $this->storageService->store($request->file('image'));
-            $data['image'] = $stored['url'];
-        } elseif ($request->filled('image')) {
-            $data['image'] = $request->input('image');
-        }
+        $stored = null;
+        try {
+            if ($request->hasFile('image')) {
+                $stored = $this->storageService->store($request->file('image'));
+                $data['image'] = $stored['path'];
+                $data['image_url'] = $stored['url'];
+            } elseif ($request->filled('image')) {
+                $data['image'] = $request->input('image');
+                $data['image_url'] = $request->input('image');
+            }
 
-        $product = Product::create($data);
+            $product = DB::transaction(fn () => Product::create($data));
+        } catch (\Throwable $e) {
+            $this->storageService->delete($stored['path'] ?? null);
+            throw $e;
+        }
 
         return response()->json([
             'success' => true,
@@ -111,13 +121,15 @@ class ProductController extends Controller
         $product = Product::query()
             ->where('id', $productIdentifier)
             ->orWhere('firestore_id', $productIdentifier)
-            ->firstOrFail();
+            ->first();
+        $isNewProduct = $product === null;
+        $product ??= new Product(['firestore_id' => (string) $productIdentifier]);
 
         $data = $request->only(['name', 'price', 'description', 'firestore_id', 'is_active', 'is_promo', 'promo_price', 'sort_order']);
 
         if (isset($data['name'])) {
             $slugBase = Str::slug($data['name']);
-            $data['slug'] = $slugBase . '-' . time();
+            $data['slug'] = $slugBase.'-'.time();
         }
 
         $categoryId = $request->input('category_id');
@@ -135,15 +147,41 @@ class ProductController extends Controller
             $data['category_id'] = $category->id;
         }
 
-        if ($request->hasFile('image')) {
-            $stored = $this->storageService->store($request->file('image'));
-            $this->storageService->delete($product->image);
-            $data['image'] = $stored['url'];
-        } elseif ($request->filled('image')) {
-            $data['image'] = $request->input('image');
+        $stored = null;
+        $oldImage = $product->image;
+        try {
+            if ($request->hasFile('image')) {
+                $stored = $this->storageService->store($request->file('image'));
+                $data['image'] = $stored['path'];
+                $data['image_url'] = $stored['url'];
+            } elseif ($request->boolean('remove_image')) {
+                $data['image'] = null;
+                $data['image_url'] = null;
+            } elseif ($request->filled('image')) {
+                $data['image'] = $request->input('image');
+                $data['image_url'] = $request->input('image');
+            }
+
+            DB::transaction(function () use ($product, $data, $productIdentifier, $isNewProduct): void {
+                if ($isNewProduct) {
+                    $product->fill([
+                        ...$data,
+                        'firestore_id' => (string) $productIdentifier,
+                    ])->save();
+
+                    return;
+                }
+
+                $product->update($data);
+            });
+        } catch (\Throwable $e) {
+            $this->storageService->delete($stored['path'] ?? null);
+            throw $e;
         }
 
-        $product->update($data);
+        if ($stored !== null || $request->boolean('remove_image')) {
+            $this->storageService->delete($oldImage);
+        }
 
         return response()->json([
             'success' => true,
@@ -157,10 +195,20 @@ class ProductController extends Controller
         $product = Product::query()
             ->where('id', $productIdentifier)
             ->orWhere('firestore_id', $productIdentifier)
-            ->firstOrFail();
+            ->first();
 
-        $this->storageService->delete($product->image);
-        $product->delete();
+        if (! $product) {
+            $this->storageService->delete($request->string('image_url')->toString());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Produk berhasil dihapus',
+            ]);
+        }
+
+        $image = $product->image;
+        DB::transaction(fn () => $product->delete());
+        $this->storageService->delete($image);
 
         return response()->json([
             'success' => true,

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreProductService;
+use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -14,8 +14,6 @@ use Illuminate\View\View;
 
 class MenuController extends Controller
 {
-    public function __construct(private readonly FirestoreProductService $products) {}
-
     public function index(Request $request): View
     {
         [$products, $error] = $this->loadProducts();
@@ -61,13 +59,28 @@ class MenuController extends Controller
 
     private function loadProducts(): array
     {
-        try {
-            return [collect($this->products->getProducts()), null];
-        } catch (\Throwable $e) {
-            // The service logs the complete exception. The UI receives a safe,
-            // explicit error instead of silently presenting an empty collection.
-            return [collect(), 'Produk belum dapat dibaca dari Firebase. Periksa konfigurasi service account dan log Laravel.'];
-        }
+        $products = Product::query()
+            ->with('category')
+            ->active()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Product $product) => [
+                'id' => (string) ($product->firestore_id ?: $product->id),
+                'name' => $product->name,
+                'description' => (string) $product->description,
+                'category' => $product->category?->name ?? 'Lainnya',
+                'price' => (float) $product->final_price,
+                'stock' => (int) ($product->stock ?? 0),
+                'minimumStock' => 0,
+                'barcode' => '',
+                'imageUrl' => $product->image_url,
+                'isActive' => true,
+                'createdAt' => $product->created_at,
+                'updatedAt' => $product->updated_at,
+            ]);
+
+        return [$products, null];
     }
 
     private function filterProducts(Collection $products, Request $request): Collection
@@ -76,11 +89,9 @@ class MenuController extends Controller
         $search = Str::lower($request->string('search')->toString());
 
         return $products
-            ->when($category !== '' && $category !== 'semua', fn (Collection $items) =>
-                $items->filter(fn (array $product) => Str::slug($product['category']) === $category)
+            ->when($category !== '' && $category !== 'semua', fn (Collection $items) => $items->filter(fn (array $product) => Str::slug($product['category']) === $category)
             )
-            ->when($search !== '', fn (Collection $items) =>
-                $items->filter(fn (array $product) => str_contains(Str::lower($product['name']), $search))
+            ->when($search !== '', fn (Collection $items) => $items->filter(fn (array $product) => str_contains(Str::lower($product['name']), $search))
             )
             ->values();
     }

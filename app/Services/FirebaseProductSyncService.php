@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 class FirebaseProductSyncService
 {
     private string $firebaseUrl;
+
     private SyncResult $result;
 
     public function __construct()
@@ -20,7 +21,7 @@ class FirebaseProductSyncService
         $defaultUrl = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}";
 
         $this->firebaseUrl = config('firebase.products_url', config('services.firebase.products_url', $defaultUrl));
-        $this->result = new SyncResult();
+        $this->result = new SyncResult;
     }
 
     /**
@@ -34,13 +35,14 @@ class FirebaseProductSyncService
             $response = Http::timeout(10)
                 ->get($this->firebaseUrl);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::error('Firebase sync failed: HTTP error', [
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
                 $this->result->success = false;
-                $this->result->error = 'HTTP error: ' . $response->status();
+                $this->result->error = 'HTTP error: '.$response->status();
+
                 return $this->result;
             }
 
@@ -48,12 +50,13 @@ class FirebaseProductSyncService
             $documents = $data['documents'] ?? [];
             $firestoreIds = [];
 
-            Log::info('Fetched ' . count($documents) . ' products from Firebase');
+            Log::info('Fetched '.count($documents).' products from Firebase');
 
             foreach ($documents as $doc) {
                 $firestoreId = $this->extractFirestoreId($doc['name'] ?? '');
-                if (!$firestoreId) {
+                if (! $firestoreId) {
                     Log::warning('Skipping document without valid ID', ['doc' => $doc]);
+
                     continue;
                 }
 
@@ -95,6 +98,7 @@ class FirebaseProductSyncService
     {
         $parts = explode('/', $name);
         $id = end($parts);
+
         return $id ?: null;
     }
 
@@ -130,15 +134,16 @@ class FirebaseProductSyncService
             // Update existing product
             $changes = $this->detectChanges($existingProduct, $fields, $category->id);
 
-            if (!empty($changes)) {
+            if (! empty($changes)) {
                 $existingProduct->update([
                     'category_id' => $category->id,
                     'name' => $name,
-                    'slug' => Str::slug($name) . '-' . $firestoreId,
+                    'slug' => Str::slug($name).'-'.$firestoreId,
                     'description' => $description,
                     'price' => intval($price),
                     'stock' => $stock,
                     'image' => $imageUrl,
+                    'image_url' => $imageUrl,
                     'is_active' => $isActive,
                     'sort_order' => 1,
                 ]);
@@ -156,11 +161,12 @@ class FirebaseProductSyncService
                 'firestore_id' => $firestoreId,
                 'category_id' => $category->id,
                 'name' => $name,
-                'slug' => Str::slug($name) . '-' . $firestoreId,
+                'slug' => Str::slug($name).'-'.$firestoreId,
                 'description' => $description,
                 'price' => intval($price),
                 'stock' => $stock,
                 'image' => $imageUrl,
+                'image_url' => $imageUrl,
                 'is_active' => $isActive,
                 'sort_order' => 1,
             ]);
@@ -200,8 +206,8 @@ class FirebaseProductSyncService
         }
 
         $imageUrl = $this->getStringValue($fields, 'imageUrl', 'stringValue', null);
-        if ($product->image !== $imageUrl) {
-            $changes['image'] = ['old' => $product->image, 'new' => $imageUrl];
+        if ($product->image_url !== $imageUrl) {
+            $changes['image_url'] = ['old' => $product->image_url, 'new' => $imageUrl];
         }
 
         $isActive = $this->getBooleanValue($fields, 'isActive', true);
@@ -278,7 +284,7 @@ class FirebaseProductSyncService
         }
 
         // Delete products that were removed from Firebase
-        if (!empty($firestoreIds)) {
+        if (! empty($firestoreIds)) {
             $deletedObsolete = Product::whereNotNull('firestore_id')
                 ->whereNotIn('firestore_id', $firestoreIds)
                 ->delete();
@@ -308,8 +314,12 @@ class FirebaseProductSyncService
 class SyncResult
 {
     public bool $success = false;
+
     public int $created = 0;
+
     public int $updated = 0;
+
     public int $deleted = 0;
+
     public ?string $error = null;
 }
