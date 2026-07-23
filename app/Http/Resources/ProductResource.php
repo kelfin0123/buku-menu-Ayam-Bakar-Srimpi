@@ -19,7 +19,16 @@ class ProductResource extends JsonResource
             'description' => $this->description,
             'image' => $this->image, // path stored in DB
             'image_url' => $this->image_url,
+            'imageUrl' => $this->image_url,
+            'firestore_id' => $this->firestore_id,
+            'cost_price' => (int) $this->cost_price,
+            'costPrice' => (int) $this->cost_price,
+            'stock' => (int) $this->stock,
+            'minimum_stock' => (int) $this->minimum_stock,
+            'minimumStock' => (int) $this->minimum_stock,
+            'barcode' => (string) $this->barcode,
             'is_active' => (bool) $this->is_active,
+            'isActive' => (bool) $this->is_active,
             'is_promo' => (bool) $this->is_promo,
         ];
     }

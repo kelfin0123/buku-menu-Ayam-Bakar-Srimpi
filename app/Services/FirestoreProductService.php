@@ -11,6 +11,7 @@ use RuntimeException;
 class FirestoreProductService
 {
     private string $projectId;
+
     private string $collection;
 
     public function __construct()
@@ -48,7 +49,7 @@ class FirestoreProductService
                 ]);
 
                 $isActive = $this->booleanValue($data['isActive'] ?? $data['is_active'] ?? true);
-                if (!$isActive) {
+                if (! $isActive) {
                     continue;
                 }
 
@@ -87,6 +88,15 @@ class FirestoreProductService
         }
     }
 
+    /**
+     * Return every encoded Firestore product document for maintenance syncs.
+     * Authentication, retries, and pagination remain centralized here.
+     */
+    public function getRawDocuments(): array
+    {
+        return $this->loadDocuments();
+    }
+
     private function loadDocuments(): array
     {
         $url = sprintf(
@@ -116,6 +126,7 @@ class FirestoreProductService
 
         if ($credentials === null) {
             Log::warning('Firestore service account is not configured; attempting access with Firestore security rules.');
+
             return $request;
         }
 
@@ -136,20 +147,22 @@ class FirestoreProductService
         if ($encoded = config('firebase.credentials_base64')) {
             $decoded = base64_decode((string) $encoded, true);
             $credentials = $decoded === false ? null : json_decode($decoded, true);
-            if (!is_array($credentials)) {
+            if (! is_array($credentials)) {
                 throw new RuntimeException('FIREBASE_CREDENTIALS_BASE64 bukan service account JSON Base64 yang valid.');
             }
+
             return $credentials;
         }
 
         if ($path = config('firebase.credentials')) {
-            if (!is_file($path) || !is_readable($path)) {
+            if (! is_file($path) || ! is_readable($path)) {
                 throw new RuntimeException("Firebase credential file tidak dapat dibaca: {$path}");
             }
             $credentials = json_decode((string) file_get_contents($path), true);
-            if (!is_array($credentials)) {
+            if (! is_array($credentials)) {
                 throw new RuntimeException('Firebase credential file bukan JSON yang valid.');
             }
+
             return $credentials;
         }
 
@@ -182,14 +195,31 @@ class FirestoreProductService
 
     private function decodeValue(array $value): mixed
     {
-        if (array_key_exists('nullValue', $value)) return null;
-        if (array_key_exists('stringValue', $value)) return $value['stringValue'];
-        if (array_key_exists('integerValue', $value)) return (int) $value['integerValue'];
-        if (array_key_exists('doubleValue', $value)) return (float) $value['doubleValue'];
-        if (array_key_exists('booleanValue', $value)) return (bool) $value['booleanValue'];
-        if (array_key_exists('timestampValue', $value)) return $value['timestampValue'];
-        if (array_key_exists('mapValue', $value)) return $this->decodeFields($value['mapValue']['fields'] ?? []);
-        if (array_key_exists('arrayValue', $value)) return array_map(fn ($item) => $this->decodeValue($item), $value['arrayValue']['values'] ?? []);
+        if (array_key_exists('nullValue', $value)) {
+            return null;
+        }
+        if (array_key_exists('stringValue', $value)) {
+            return $value['stringValue'];
+        }
+        if (array_key_exists('integerValue', $value)) {
+            return (int) $value['integerValue'];
+        }
+        if (array_key_exists('doubleValue', $value)) {
+            return (float) $value['doubleValue'];
+        }
+        if (array_key_exists('booleanValue', $value)) {
+            return (bool) $value['booleanValue'];
+        }
+        if (array_key_exists('timestampValue', $value)) {
+            return $value['timestampValue'];
+        }
+        if (array_key_exists('mapValue', $value)) {
+            return $this->decodeFields($value['mapValue']['fields'] ?? []);
+        }
+        if (array_key_exists('arrayValue', $value)) {
+            return array_map(fn ($item) => $this->decodeValue($item), $value['arrayValue']['values'] ?? []);
+        }
+
         return null;
     }
 
@@ -198,6 +228,7 @@ class FirestoreProductService
         if (is_string($value)) {
             return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
         }
+
         return (bool) $value;
     }
 }

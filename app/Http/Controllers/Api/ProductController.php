@@ -73,7 +73,12 @@ class ProductController extends Controller
 
     public function store(ProductStoreRequest $request): JsonResponse
     {
-        $data = $request->only(['name', 'price', 'description', 'firestore_id', 'is_active', 'is_promo', 'promo_price', 'sort_order']);
+        $data = $request->only([
+            'name', 'price', 'description', 'firestore_id', 'is_active',
+            'is_promo', 'promo_price', 'sort_order', 'cost_price', 'stock',
+            'minimum_stock', 'barcode',
+        ]);
+        $data['barcode'] = (string) ($data['barcode'] ?? '');
 
         $slugBase = Str::slug($data['name']);
         $data['slug'] = $slugBase.'-'.time();
@@ -116,6 +121,65 @@ class ProductController extends Controller
         ]);
     }
 
+    public function sync(ProductStoreRequest $request): JsonResponse
+    {
+        $request->validate([
+            'firestore_id' => ['required', 'string', 'max:255'],
+        ]);
+        $data = $request->only([
+            'name', 'price', 'description', 'firestore_id', 'is_active',
+            'cost_price', 'stock', 'minimum_stock', 'barcode',
+        ]);
+        $data['cost_price'] = (int) ($data['cost_price'] ?? 0);
+        $data['stock'] = (int) ($data['stock'] ?? 0);
+        $data['minimum_stock'] = (int) ($data['minimum_stock'] ?? 5);
+        $data['barcode'] = (string) ($data['barcode'] ?? '');
+        $firestoreId = (string) $request->input('firestore_id');
+        $data['slug'] = Str::slug($data['name']).'-'.substr(sha1($firestoreId), 0, 12);
+
+        $category = Category::firstOrCreate(
+            ['name' => $request->input('category', 'Umum')],
+            [
+                'slug' => Str::slug($request->input('category', 'Umum')),
+                'is_active' => true,
+                'sort_order' => 1,
+            ],
+        );
+        $data['category_id'] = $category->id;
+
+        $existing = Product::where('firestore_id', $firestoreId)->first();
+        $oldImage = $existing?->image;
+        $stored = null;
+
+        try {
+            if ($request->hasFile('image')) {
+                $stored = $this->storageService->store($request->file('image'));
+                $data['image'] = $stored['path'];
+                $data['image_url'] = $stored['url'];
+            } elseif ($request->filled('image_url')) {
+                $data['image_url'] = $request->input('image_url');
+            }
+
+            $product = DB::transaction(fn () => Product::updateOrCreate(
+                ['firestore_id' => $firestoreId],
+                $data,
+            ));
+        } catch (\Throwable $e) {
+            $this->storageService->delete($stored['path'] ?? null);
+            throw $e;
+        }
+
+        if ($stored !== null && $oldImage !== null && $oldImage !== $product->image) {
+            $this->storageService->delete($oldImage);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Produk berhasil disinkronkan',
+            'data' => new ProductResource($product->fresh()),
+        ]);
+    }
+
     public function update(ProductUpdateRequest $request, $productIdentifier): JsonResponse
     {
         $product = Product::query()
@@ -125,7 +189,14 @@ class ProductController extends Controller
         $isNewProduct = $product === null;
         $product ??= new Product(['firestore_id' => (string) $productIdentifier]);
 
-        $data = $request->only(['name', 'price', 'description', 'firestore_id', 'is_active', 'is_promo', 'promo_price', 'sort_order']);
+        $data = $request->only([
+            'name', 'price', 'description', 'firestore_id', 'is_active',
+            'is_promo', 'promo_price', 'sort_order', 'cost_price', 'stock',
+            'minimum_stock', 'barcode',
+        ]);
+        if (array_key_exists('barcode', $data)) {
+            $data['barcode'] = (string) ($data['barcode'] ?? '');
+        }
 
         if (isset($data['name'])) {
             $slugBase = Str::slug($data['name']);

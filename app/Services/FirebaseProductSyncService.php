@@ -4,313 +4,165 @@ namespace App\Services;
 
 use App\Models\Category;
 use App\Models\Product;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class FirebaseProductSyncService
 {
-    private string $firebaseUrl;
+    public function __construct(
+        private readonly FirestoreProductService $firestore = new FirestoreProductService,
+    ) {}
 
-    private SyncResult $result;
-
-    public function __construct()
+    public function sync(bool $dryRun = false): SyncResult
     {
-        $projectId = config('firebase.project_id', config('services.firebase.project_id', 'kasir-40363'));
-        $collection = config('firebase.products_collection', config('services.firebase.products_collection', 'products'));
-        $defaultUrl = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}";
-
-        $this->firebaseUrl = config('firebase.products_url', config('services.firebase.products_url', $defaultUrl));
-        $this->result = new SyncResult;
-    }
-
-    /**
-     * Sync products from Firebase to PostgreSQL
-     */
-    public function sync(): SyncResult
-    {
-        Log::info('Starting Firebase product sync');
+        $result = new SyncResult;
 
         try {
-            $response = Http::timeout(10)
-                ->get($this->firebaseUrl);
+            foreach ($this->firestore->getRawDocuments() as $document) {
+                try {
+                    $firestoreId = basename((string) ($document['name'] ?? ''));
+                    if ($firestoreId === '') {
+                        $result->skipped++;
 
-            if (! $response->successful()) {
-                Log::error('Firebase sync failed: HTTP error', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                $this->result->success = false;
-                $this->result->error = 'HTTP error: '.$response->status();
+                        continue;
+                    }
 
-                return $this->result;
-            }
-
-            $data = $response->json();
-            $documents = $data['documents'] ?? [];
-            $firestoreIds = [];
-
-            Log::info('Fetched '.count($documents).' products from Firebase');
-
-            foreach ($documents as $doc) {
-                $firestoreId = $this->extractFirestoreId($doc['name'] ?? '');
-                if (! $firestoreId) {
-                    Log::warning('Skipping document without valid ID', ['doc' => $doc]);
-
-                    continue;
+                    $this->syncProduct(
+                        $firestoreId,
+                        $document['fields'] ?? [],
+                        $dryRun,
+                        $result,
+                    );
+                } catch (Throwable) {
+                    $result->failed++;
                 }
-
-                $firestoreIds[] = $firestoreId;
-                $fields = $doc['fields'] ?? [];
-
-                $this->syncProduct($firestoreId, $fields);
             }
 
-            // Delete products that are in PostgreSQL but not in Firebase
-            $this->deleteObsoleteProducts($firestoreIds);
-
-            // Delete empty categories
-            $this->deleteEmptyCategories();
-
-            $this->result->success = true;
-            Log::info('Firebase sync completed', [
-                'created' => $this->result->created,
-                'updated' => $this->result->updated,
-                'deleted' => $this->result->deleted,
-            ]);
-
-        } catch (\Throwable $e) {
-            Log::error('Firebase sync failed: Exception', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            $this->result->success = false;
-            $this->result->error = $e->getMessage();
+            $result->success = $result->failed === 0;
+        } catch (Throwable $e) {
+            $result->success = false;
+            $result->error = $e->getMessage();
         }
 
-        return $this->result;
+        return $result;
     }
 
-    /**
-     * Extract Firestore ID from document name
-     */
-    private function extractFirestoreId(string $name): ?string
-    {
-        $parts = explode('/', $name);
-        $id = end($parts);
+    private function syncProduct(
+        string $firestoreId,
+        array $fields,
+        bool $dryRun,
+        SyncResult $result,
+    ): void {
+        $data = [
+            'name' => $this->stringValue($fields, 'name', 'Produk tanpa nama'),
+            'description' => $this->stringValue($fields, 'description'),
+            'category' => $this->stringValue($fields, 'category', 'Umum'),
+            'price' => $this->integerValue($fields, 'price'),
+            'cost_price' => $this->integerValue($fields, 'costPrice'),
+            'stock' => $this->integerValue($fields, 'stock'),
+            'minimum_stock' => $this->integerValue($fields, 'minimumStock', 5),
+            'barcode' => $this->stringValue($fields, 'barcode'),
+            'image_url' => $this->nullableStringValue($fields, 'imageUrl'),
+            'is_active' => $this->booleanValue($fields, 'isActive', true),
+        ];
 
-        return $id ?: null;
-    }
+        $existing = Product::with('category')
+            ->where('firestore_id', $firestoreId)
+            ->first();
+        $changed = $existing === null
+            || $existing->name !== $data['name']
+            || (string) $existing->description !== $data['description']
+            || $existing->category?->name !== $data['category']
+            || (int) $existing->price !== $data['price']
+            || (int) $existing->cost_price !== $data['cost_price']
+            || (int) $existing->stock !== $data['stock']
+            || (int) $existing->minimum_stock !== $data['minimum_stock']
+            || (string) $existing->barcode !== $data['barcode']
+            || $existing->getRawOriginal('image_url') !== $data['image_url']
+            || (bool) $existing->is_active !== $data['is_active'];
 
-    /**
-     * Sync a single product from Firebase to PostgreSQL
-     */
-    private function syncProduct(string $firestoreId, array $fields): void
-    {
-        $name = $this->getStringValue($fields, 'name');
-        $price = $this->getNumericValue($fields, 'price');
-        $categoryName = $this->getStringValue($fields, 'category', 'stringValue', 'Umum');
-        $description = $this->getStringValue($fields, 'description');
-        $imageUrl = $this->getStringValue($fields, 'imageUrl', 'stringValue', null);
-        $isActive = $this->getBooleanValue($fields, 'isActive', true);
-        $stock = $this->getIntegerValue($fields, 'stock', 0);
-        $minimumStock = $this->getIntegerValue($fields, 'minimumStock', 5);
-        $barcode = $this->getStringValue($fields, 'barcode');
+        if ($dryRun) {
+            if ($existing === null) {
+                $result->created++;
+            } elseif ($changed) {
+                $result->updated++;
+            } else {
+                $result->skipped++;
+            }
 
-        // Get or create Category
+            return;
+        }
+
+        if (! $changed) {
+            $result->skipped++;
+
+            return;
+        }
+
         $category = Category::firstOrCreate(
-            ['name' => $categoryName],
+            ['name' => $data['category']],
             [
-                'slug' => Str::slug($categoryName),
+                'slug' => Str::slug($data['category']),
                 'is_active' => true,
                 'sort_order' => 1,
-            ]
+            ],
         );
 
-        // Check if product exists
-        $existingProduct = Product::where('firestore_id', $firestoreId)->first();
-
-        if ($existingProduct) {
-            // Update existing product
-            $changes = $this->detectChanges($existingProduct, $fields, $category->id);
-
-            if (! empty($changes)) {
-                $existingProduct->update([
-                    'category_id' => $category->id,
-                    'name' => $name,
-                    'slug' => Str::slug($name).'-'.$firestoreId,
-                    'description' => $description,
-                    'price' => intval($price),
-                    'stock' => $stock,
-                    'image' => $imageUrl,
-                    'image_url' => $imageUrl,
-                    'is_active' => $isActive,
-                    'sort_order' => 1,
-                ]);
-
-                $this->result->updated++;
-                Log::info('Product updated', [
-                    'firestore_id' => $firestoreId,
-                    'name' => $name,
-                    'changes' => $changes,
-                ]);
-            }
-        } else {
-            // Create new product
-            Product::create([
-                'firestore_id' => $firestoreId,
+        Product::updateOrCreate(
+            ['firestore_id' => $firestoreId],
+            [
                 'category_id' => $category->id,
-                'name' => $name,
-                'slug' => Str::slug($name).'-'.$firestoreId,
-                'description' => $description,
-                'price' => intval($price),
-                'stock' => $stock,
-                'image' => $imageUrl,
-                'image_url' => $imageUrl,
-                'is_active' => $isActive,
+                'name' => $data['name'],
+                'slug' => Str::slug($data['name']).'-'.substr(sha1($firestoreId), 0, 12),
+                'description' => $data['description'],
+                'price' => $data['price'],
+                'cost_price' => $data['cost_price'],
+                'stock' => $data['stock'],
+                'minimum_stock' => $data['minimum_stock'],
+                'barcode' => $data['barcode'],
+                'image_url' => $data['image_url'],
+                'is_active' => $data['is_active'],
                 'sort_order' => 1,
-            ]);
+            ],
+        );
 
-            $this->result->created++;
-            Log::info('Product created', [
-                'firestore_id' => $firestoreId,
-                'name' => $name,
-            ]);
-        }
+        $existing === null ? $result->created++ : $result->updated++;
     }
 
-    /**
-     * Detect changes between existing product and Firebase data
-     */
-    private function detectChanges(Product $product, array $fields, int $newCategoryId): array
+    private function rawValue(array $fields, string $field): mixed
     {
-        $changes = [];
+        $encoded = $fields[$field] ?? [];
 
-        if ($product->category_id !== $newCategoryId) {
-            $changes['category_id'] = ['old' => $product->category_id, 'new' => $newCategoryId];
-        }
-
-        $name = $this->getStringValue($fields, 'name');
-        if ($product->name !== $name) {
-            $changes['name'] = ['old' => $product->name, 'new' => $name];
-        }
-
-        $price = $this->getNumericValue($fields, 'price');
-        if ($product->price !== intval($price)) {
-            $changes['price'] = ['old' => $product->price, 'new' => intval($price)];
-        }
-
-        $description = $this->getStringValue($fields, 'description');
-        if ($product->description !== $description) {
-            $changes['description'] = ['old' => $product->description, 'new' => $description];
-        }
-
-        $imageUrl = $this->getStringValue($fields, 'imageUrl', 'stringValue', null);
-        if ($product->image_url !== $imageUrl) {
-            $changes['image_url'] = ['old' => $product->image_url, 'new' => $imageUrl];
-        }
-
-        $isActive = $this->getBooleanValue($fields, 'isActive', true);
-        if ($product->is_active !== $isActive) {
-            $changes['is_active'] = ['old' => $product->is_active, 'new' => $isActive];
-        }
-
-        $stock = $this->getIntegerValue($fields, 'stock', 0);
-        if ($product->stock !== $stock) {
-            $changes['stock'] = ['old' => $product->stock, 'new' => $stock];
-        }
-
-        return $changes;
+        return $encoded['stringValue']
+            ?? $encoded['integerValue']
+            ?? $encoded['doubleValue']
+            ?? $encoded['booleanValue']
+            ?? null;
     }
 
-    private function getStringValue(array $fields, string $field, string $valueKey = 'stringValue', ?string $default = ''): ?string
+    private function stringValue(array $fields, string $field, string $default = ''): string
     {
-        $value = $fields[$field][$valueKey] ?? null;
-
-        if ($value === null) {
-            return $default;
-        }
-
-        if (is_bool($value)) {
-            return $value ? '1' : '0';
-        }
-
-        return (string) $value;
+        return (string) ($this->rawValue($fields, $field) ?? $default);
     }
 
-    private function getBooleanValue(array $fields, string $field, bool $default = true): bool
+    private function nullableStringValue(array $fields, string $field): ?string
     {
-        $value = $fields[$field]['booleanValue'] ?? null;
+        $value = $this->rawValue($fields, $field);
 
-        if ($value === null) {
-            return $default;
-        }
-
-        return (bool) $value;
+        return $value === null || $value === '' ? null : (string) $value;
     }
 
-    private function getIntegerValue(array $fields, string $field, int $default = 0): int
+    private function integerValue(array $fields, string $field, int $default = 0): int
     {
-        $value = $fields[$field]['integerValue'] ?? null;
-
-        if ($value === null) {
-            return $default;
-        }
-
-        return (int) $value;
+        return (int) ($this->rawValue($fields, $field) ?? $default);
     }
 
-    private function getNumericValue(array $fields, string $field): float|int
+    private function booleanValue(array $fields, string $field, bool $default): bool
     {
-        $value = $fields[$field]['doubleValue'] ?? $fields[$field]['integerValue'] ?? null;
-
-        if ($value === null) {
-            return 0;
-        }
-
-        return is_string($value) ? (float) $value : $value;
-    }
-
-    /**
-     * Delete products that are in PostgreSQL but not in Firebase
-     */
-    private function deleteObsoleteProducts(array $firestoreIds): void
-    {
-        // Delete products without firestore_id (should not exist, but just in case)
-        $deletedWithoutId = Product::whereNull('firestore_id')->delete();
-        if ($deletedWithoutId > 0) {
-            $this->result->deleted += $deletedWithoutId;
-            Log::info('Deleted products without firestore_id', ['count' => $deletedWithoutId]);
-        }
-
-        // Delete products that were removed from Firebase
-        if (! empty($firestoreIds)) {
-            $deletedObsolete = Product::whereNotNull('firestore_id')
-                ->whereNotIn('firestore_id', $firestoreIds)
-                ->delete();
-
-            if ($deletedObsolete > 0) {
-                $this->result->deleted += $deletedObsolete;
-                Log::info('Deleted obsolete products', ['count' => $deletedObsolete]);
-            }
-        }
-    }
-
-    /**
-     * Delete empty categories
-     */
-    private function deleteEmptyCategories(): void
-    {
-        $deletedCategories = Category::doesntHave('products')->delete();
-        if ($deletedCategories > 0) {
-            Log::info('Deleted empty categories', ['count' => $deletedCategories]);
-        }
+        return (bool) ($this->rawValue($fields, $field) ?? $default);
     }
 }
 
-/**
- * Sync result class
- */
 class SyncResult
 {
     public bool $success = false;
@@ -319,7 +171,9 @@ class SyncResult
 
     public int $updated = 0;
 
-    public int $deleted = 0;
+    public int $skipped = 0;
+
+    public int $failed = 0;
 
     public ?string $error = null;
 }

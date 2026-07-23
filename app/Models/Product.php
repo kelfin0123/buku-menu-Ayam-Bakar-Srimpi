@@ -20,7 +20,10 @@ class Product extends Model
         'promo_price',
         'image',
         'image_url',
+        'cost_price',
         'stock',
+        'minimum_stock',
+        'barcode',
         'is_promo',
         'is_active',
         'sort_order',
@@ -32,6 +35,8 @@ class Product extends Model
         'is_active' => 'boolean',
         'price' => 'integer',
         'stock' => 'integer',
+        'cost_price' => 'integer',
+        'minimum_stock' => 'integer',
         'promo_price' => 'integer',
     ];
 

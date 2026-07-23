@@ -12,34 +12,43 @@ class SyncFirebaseProducts extends Command
      *
      * @var string
      */
-    protected $signature = 'products:sync-firebase';
+    protected $signature = 'products:sync-from-firestore {--dry-run : Preview changes without writing to MySQL}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sync products from Firebase Firestore to PostgreSQL';
+    protected $description = 'Sync products from Firebase Firestore to the Laravel database';
 
     /**
      * Execute the console command.
      */
-    public function handle(): int
+    public function handle(FirebaseProductSyncService $service): int
     {
-        $this->info('Starting Firebase product sync...');
+        $dryRun = (bool) $this->option('dry-run');
+        $this->info($dryRun
+            ? 'Previewing Firestore product sync (dry-run)...'
+            : 'Starting Firestore product sync...');
 
-        $service = new FirebaseProductSyncService();
-        $result = $service->sync();
+        $result = $service->sync($dryRun);
 
         if ($result->success) {
             $this->info('✓ Sync completed successfully');
             $this->info("  Created: {$result->created}");
             $this->info("  Updated: {$result->updated}");
-            $this->info("  Deleted: {$result->deleted}");
+            $this->info("  Skipped: {$result->skipped}");
+            $this->info("  Failed: {$result->failed}");
+
             return Command::SUCCESS;
-        } else {
-            $this->error('✗ Sync failed: ' . $result->error);
-            return Command::FAILURE;
         }
+
+        $this->error('✗ Sync failed: '.($result->error ?? 'one or more documents could not be synchronized'));
+        $this->info("  Created: {$result->created}");
+        $this->info("  Updated: {$result->updated}");
+        $this->info("  Skipped: {$result->skipped}");
+        $this->info("  Failed: {$result->failed}");
+
+        return Command::FAILURE;
     }
 }

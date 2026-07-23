@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
@@ -10,6 +11,7 @@ Route::get('products', [ProductController::class, 'index']);
 Route::get('products/{product}', [ProductController::class, 'show']);
 Route::post('products/upload', [ProductController::class, 'uploadImage']);
 Route::post('products/upload-image', [ProductController::class, 'uploadImage']);
+Route::post('products/sync', [ProductController::class, 'sync']);
 Route::post('products', [ProductController::class, 'store']);
 Route::match(['put', 'post'], 'products/{product}', [ProductController::class, 'update']);
 Route::delete('products/{product}', [ProductController::class, 'destroy']);
@@ -37,7 +39,7 @@ Route::prefix('payment')->group(function () {
 
 Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum'])->group(function () {
-        Route::get('activities', [\App\Http\Controllers\Api\ActivityController::class, 'index']);
-        Route::post('activities/{activity}/read', [\App\Http\Controllers\Api\ActivityController::class, 'markRead']);
+        Route::get('activities', [ActivityController::class, 'index']);
+        Route::post('activities/{activity}/read', [ActivityController::class, 'markRead']);
     });
 });
