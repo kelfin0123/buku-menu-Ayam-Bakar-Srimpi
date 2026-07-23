@@ -58,6 +58,45 @@ class ProductSyncTest extends TestCase
             ->assertSee('images/no-image.png', false);
     }
 
+    public function test_standard_create_endpoint_accepts_camel_case_and_upserts_by_firestore_id(): void
+    {
+        $payload = [
+            'firestore_id' => 'firestore-standard-endpoint',
+            'name' => 'Sate Ayam',
+            'description' => '',
+            'category' => 'Makanan',
+            'price' => 24000,
+            'costPrice' => 10000,
+            'stock' => 12,
+            'minimumStock' => 4,
+            'barcode' => '',
+            'isActive' => true,
+            'imageUrl' => null,
+        ];
+
+        $this->postJson('/api/products', $payload)
+            ->assertOk()
+            ->assertJsonPath('data.cost_price', 10000)
+            ->assertJsonPath('data.minimum_stock', 4)
+            ->assertJsonPath('data.is_active', true);
+
+        $this->postJson('/api/products', [
+            ...$payload,
+            'name' => 'Sate Ayam Baru',
+            'stock' => 9,
+        ])->assertOk();
+
+        $this->assertDatabaseCount('products', 1);
+        $this->assertDatabaseHas('products', [
+            'firestore_id' => 'firestore-standard-endpoint',
+            'name' => 'Sate Ayam Baru',
+            'cost_price' => 10000,
+            'minimum_stock' => 4,
+            'stock' => 9,
+            'is_active' => true,
+        ]);
+    }
+
     public function test_sync_with_image_uses_one_url_and_inactive_or_deleted_product_is_hidden(): void
     {
         Storage::fake('public');

@@ -6,6 +6,28 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class ProductStoreRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $mapping = [
+            'cost_price' => 'costPrice',
+            'minimum_stock' => 'minimumStock',
+            'is_active' => 'isActive',
+            'image_url' => 'imageUrl',
+        ];
+        $normalized = [];
+
+        foreach ($mapping as $snakeCase => $camelCase) {
+            if ($this->exists($snakeCase) || $this->exists($camelCase)) {
+                $normalized[$snakeCase] = $this->input(
+                    $snakeCase,
+                    $this->input($camelCase),
+                );
+            }
+        }
+
+        $this->merge($normalized);
+    }
+
     public function authorize(): bool
     {
         return true;

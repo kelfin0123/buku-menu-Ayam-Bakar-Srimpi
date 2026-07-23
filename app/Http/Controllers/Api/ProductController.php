@@ -73,6 +73,10 @@ class ProductController extends Controller
 
     public function store(ProductStoreRequest $request): JsonResponse
     {
+        if ($request->filled('firestore_id')) {
+            return $this->sync($request);
+        }
+
         $data = $request->only([
             'name', 'price', 'description', 'firestore_id', 'is_active',
             'is_promo', 'promo_price', 'sort_order', 'cost_price', 'stock',
@@ -106,6 +110,8 @@ class ProductController extends Controller
             } elseif ($request->filled('image')) {
                 $data['image'] = $request->input('image');
                 $data['image_url'] = $request->input('image');
+            } elseif ($request->filled('image_url')) {
+                $data['image_url'] = $request->input('image_url');
             }
 
             $product = DB::transaction(fn () => Product::create($data));
@@ -231,6 +237,8 @@ class ProductController extends Controller
             } elseif ($request->filled('image')) {
                 $data['image'] = $request->input('image');
                 $data['image_url'] = $request->input('image');
+            } elseif ($request->filled('image_url')) {
+                $data['image_url'] = $request->input('image_url');
             }
 
             DB::transaction(function () use ($product, $data, $productIdentifier, $isNewProduct): void {
