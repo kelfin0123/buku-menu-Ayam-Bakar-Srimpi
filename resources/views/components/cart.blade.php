@@ -26,6 +26,12 @@
             </div>
         </div>
 
+        <label class="payment-method-option" for="cartIsDelivery">
+            <input type="checkbox" id="cartIsDelivery">
+            <strong>Pesan Antar ke Rumah</strong>
+            <span>Pesanan akan diantar ke alamat Anda.</span>
+        </label>
+
         <button type="button" id="cartCheckoutBtn" class="cart-checkout-btn">
             Pesan Sekarang
             <span>@include('components.icons.send')</span>

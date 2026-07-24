@@ -26,9 +26,38 @@
 
         <form id="checkoutForm" class="checkout-form" method="POST" action="{{ route('checkout.store') }}">
             @csrf
+            <label class="payment-method-option" for="is_delivery">
+                <input
+                    type="checkbox"
+                    name="is_delivery"
+                    id="is_delivery"
+                    value="1"
+                    @checked(old('is_delivery'))
+                >
+                <strong>Pesan Antar ke Rumah</strong>
+                <span>Pesanan akan diantar ke alamat Anda.</span>
+            </label>
             <div class="checkout-field">
                 <label for="customer_name">Nama Customer</label>
                 <input type="text" name="customer_name" id="customer_name" required placeholder="Masukkan nama Anda" value="{{ old('customer_name') }}">
+            </div>
+            <div id="deliveryFields" hidden>
+                <div class="checkout-field">
+                    <label for="delivery_address">Alamat Lengkap</label>
+                    <textarea name="delivery_address" id="delivery_address" maxlength="500" rows="4">{{ old('delivery_address') }}</textarea>
+                </div>
+                <div class="checkout-field">
+                    <label for="delivery_address_detail">Detail Alamat / Patokan</label>
+                    <textarea name="delivery_address_detail" id="delivery_address_detail" maxlength="250" rows="2">{{ old('delivery_address_detail') }}</textarea>
+                </div>
+                <div class="checkout-field">
+                    <label for="delivery_note">Catatan Pengantaran (Opsional)</label>
+                    <textarea name="delivery_note" id="delivery_note" maxlength="250" rows="2">{{ old('delivery_note') }}</textarea>
+                </div>
+                <div class="alert alert-danger">
+                    <strong>Total pesanan belum termasuk ongkos kirim.</strong><br>
+                    Ongkos kirim akan dikonfirmasi oleh kasir melalui WhatsApp setelah alamat diperiksa.
+                </div>
             </div>
             <div class="checkout-field">
                 <label for="customer_phone">Nomor WhatsApp (Opsional)</label>
@@ -62,6 +91,26 @@
     <script>
         // Direct inline script - no module imports
         const CART_KEY = 'ayam_bakar_srimpi_cart';
+        const deliveryToggle = document.getElementById('is_delivery');
+        const deliveryFields = document.getElementById('deliveryFields');
+        const deliveryAddress = document.getElementById('delivery_address');
+        const customerPhone = document.getElementById('customer_phone');
+        const tableNumber = document.getElementById('table_number');
+
+        function syncDeliveryFields() {
+            const enabled = deliveryToggle.checked;
+            deliveryFields.hidden = !enabled;
+            deliveryAddress.required = enabled;
+            customerPhone.required = enabled;
+            tableNumber.required = !enabled;
+            sessionStorage.setItem('is_delivery', enabled ? '1' : '0');
+        }
+
+        if (!deliveryToggle.checked && sessionStorage.getItem('is_delivery') === '1') {
+            deliveryToggle.checked = true;
+        }
+        deliveryToggle.addEventListener('change', syncDeliveryFields);
+        syncDeliveryFields();
 
         function getCart() {
             try {

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\FirestoreOrderService;
 use App\Services\OrderProductResolver;
+use App\Services\WhatsAppLinkService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CheckoutController extends Controller
@@ -15,6 +17,7 @@ class CheckoutController extends Controller
     public function __construct(
         private readonly OrderProductResolver $productResolver,
         private readonly FirestoreOrderService $firestoreOrders,
+        private readonly WhatsAppLinkService $whatsApp,
     ) {}
 
     /**
@@ -33,19 +36,38 @@ class CheckoutController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $isDelivery = $request->boolean('is_delivery');
         $validated = $request->validate([
-            'customer_name' => 'required|string|max:255',
+            'customer_name' => ['required', 'string', 'max:100'],
             'customer_phone' => [
+                Rule::requiredIf($isDelivery),
                 'nullable',
                 'string',
                 'max:20',
                 'regex:/^(?:\+?62|0|8)[0-9\s-]{8,17}$/',
             ],
-            'table_number' => 'required|string|max:50',
+            'table_number' => [
+                Rule::requiredIf(! $isDelivery),
+                'nullable',
+                'string',
+                'max:50',
+            ],
+            'is_delivery' => 'nullable|boolean',
+            'delivery_address' => [
+                Rule::requiredIf($isDelivery),
+                'nullable',
+                'string',
+                'max:500',
+            ],
+            'delivery_address_detail' => 'nullable|string|max:250',
+            'delivery_note' => 'nullable|string|max:250',
             'items' => 'required|array|min:1',
             'items.*.firestore_id' => 'required|string',
             'items.*.qty' => 'required|integer|min:1',
         ]);
+        $customerPhone = filled($validated['customer_phone'] ?? null)
+            ? $this->whatsApp->normalizePhone($validated['customer_phone'])
+            : '';
 
         $subtotal = 0;
         $itemsData = [];
@@ -75,11 +97,18 @@ class CheckoutController extends Controller
             $order = Order::create([
                 'order_code' => Order::generateOrderCode(),
                 'customer_name' => $validated['customer_name'],
-                'customer_phone' => $validated['customer_phone'] ?? '',
+                'customer_phone' => $customerPhone,
                 'customer_address' => null,
-                'table_number' => $validated['table_number'],
+                'is_delivery' => $isDelivery,
+                'order_type' => $isDelivery ? 'delivery' : 'pickup',
+                'delivery_address' => $isDelivery ? $validated['delivery_address'] : null,
+                'delivery_address_detail' => $isDelivery ? ($validated['delivery_address_detail'] ?? null) : null,
+                'delivery_note' => $isDelivery ? ($validated['delivery_note'] ?? null) : null,
+                'table_number' => $validated['table_number'] ?? null,
                 'subtotal' => $subtotal,
                 'shipping_cost' => 0,
+                'delivery_fee' => null,
+                'delivery_fee_status' => $isDelivery ? 'pending' : null,
                 'total' => $subtotal,
                 'payment_method' => null,
                 'payment_status' => Order::PAYMENT_STATUS_PENDING,
@@ -111,7 +140,7 @@ class CheckoutController extends Controller
     public function selectPayment(Request $request, string $orderCode): RedirectResponse
     {
         $validated = $request->validate([
-            'payment_method' => ['required', 'in:cash,qris'],
+            'payment_method' => ['required', 'in:cash,qris,bank_transfer'],
         ]);
         $order = Order::where('order_code', $orderCode)->firstOrFail();
 
@@ -120,17 +149,27 @@ class CheckoutController extends Controller
         }
 
         $method = $validated['payment_method'];
+        if ($order->is_delivery && $method === Order::PAYMENT_METHOD_CASH) {
+            return back()->withErrors([
+                'payment_method' => 'Pesanan antar hanya dapat dibayar melalui QR atau Transfer Bank.',
+            ]);
+        }
         $order->update([
             'payment_method' => $method,
             'payment_status' => Order::PAYMENT_STATUS_PENDING,
-            'status' => $method === Order::PAYMENT_METHOD_CASH
+            'status' => in_array($method, [
+                Order::PAYMENT_METHOD_CASH,
+                Order::PAYMENT_METHOD_BANK_TRANSFER,
+            ], true)
                 ? Order::STATUS_NEW_ORDER
                 : Order::STATUS_WAITING_PAYMENT,
             'expires_at' => now()->addMinutes($method === Order::PAYMENT_METHOD_CASH ? 60 : 15),
         ]);
         $this->firestoreOrders->sync($order->fresh('items.product'));
 
-        return redirect()->route('checkout.payment', $order->order_code);
+        return $method === Order::PAYMENT_METHOD_BANK_TRANSFER
+            ? redirect()->route('order.show', $order->order_code)
+            : redirect()->route('checkout.payment', $order->order_code);
     }
 
     /**

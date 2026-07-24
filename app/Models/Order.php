@@ -16,9 +16,16 @@ class Order extends Model
         'customer_name',
         'customer_phone',
         'customer_address',
+        'is_delivery',
+        'order_type',
+        'delivery_address',
+        'delivery_address_detail',
+        'delivery_note',
         'table_number',
         'subtotal',
         'shipping_cost',
+        'delivery_fee',
+        'delivery_fee_status',
         'total',
         'payment_method',
         'payment_status',
@@ -34,6 +41,8 @@ class Order extends Model
     ];
 
     protected $casts = [
+        'is_delivery' => 'boolean',
+        'delivery_fee' => 'decimal:2',
         'accepted_at' => 'datetime',
         'finished_at' => 'datetime',
         'rejected_at' => 'datetime',
@@ -42,21 +51,32 @@ class Order extends Model
 
     // Order Status Constants
     const STATUS_WAITING_PAYMENT = 'waiting_payment';
+
     const STATUS_NEW_ORDER = 'new_order';
+
     const STATUS_PROCESSING = 'processing';
+
     const STATUS_READY = 'ready';
+
     const STATUS_COMPLETED = 'completed';
+
     const STATUS_CANCELLED = 'cancelled';
+
     const STATUS_EXPIRED = 'expired';
 
     // Payment Status Constants
     const PAYMENT_STATUS_PENDING = 'pending';
+
     const PAYMENT_STATUS_PAID = 'paid';
+
     const PAYMENT_STATUS_FAILED = 'failed';
 
     // Payment Method Constants
     const PAYMENT_METHOD_CASH = 'cash';
+
     const PAYMENT_METHOD_QRIS = 'qris';
+
+    const PAYMENT_METHOD_BANK_TRANSFER = 'bank_transfer';
 
     public function items(): HasMany
     {
@@ -66,7 +86,7 @@ class Order extends Model
     /** Generate kode order unik: ABS-YYYYMMDD-XXXX */
     public static function generateOrderCode(): string
     {
-        return 'ABS-' . now()->format('Ymd') . '-' . strtoupper(Str::random(4));
+        return 'ABS-'.now()->format('Ymd').'-'.strtoupper(Str::random(4));
     }
 
     /** Check if order is expired */
@@ -98,6 +118,11 @@ class Order extends Model
                 $cash->where('status', self::STATUS_NEW_ORDER)
                     ->where('payment_method', self::PAYMENT_METHOD_CASH)
                     ->where('payment_status', self::PAYMENT_STATUS_PENDING);
+            })->orWhere(function ($bankTransfer) {
+                $bankTransfer->where('status', self::STATUS_NEW_ORDER)
+                    ->where('is_delivery', true)
+                    ->where('payment_method', self::PAYMENT_METHOD_BANK_TRANSFER)
+                    ->where('payment_status', self::PAYMENT_STATUS_PENDING);
             });
         })
             ->orderByDesc('created_at');
@@ -109,7 +134,7 @@ class Order extends Model
         return $query->whereNotIn('status', [
             self::STATUS_CANCELLED,
             self::STATUS_EXPIRED,
-            self::STATUS_COMPLETED
+            self::STATUS_COMPLETED,
         ]);
     }
 }

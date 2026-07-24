@@ -41,8 +41,9 @@ class WhatsAppLinkService
 
         $message = sprintf(
             "Halo %s 👋\n\n".
-            "Terima kasih telah melakukan pemesanan di Ayam Bakar Srimpi.\n\n".
+            "%s\n\n".
             "No. Transaksi: %s\n".
+            "Tipe Pesanan: %s\n".
             "Tanggal: %s\n".
             "Metode Pembayaran: %s\n\n".
             "Detail Pesanan:\n%s\n\n".
@@ -52,7 +53,11 @@ class WhatsAppLinkService
             "Total: %s\n\n".
             'Status: %s',
             $order->customer_name ?: 'Pelanggan',
+            $order->is_delivery
+                ? 'Pesanan Anda telah dibuat di Ayam Bakar Srimpi.'
+                : 'Terima kasih telah melakukan pemesanan di Ayam Bakar Srimpi.',
             $order->order_code,
+            $order->is_delivery ? 'Pesan Antar' : 'Ambil Sendiri',
             $order->created_at->timezone(config('app.timezone'))->format('d/m/Y H:i'),
             strtoupper((string) ($order->payment_method ?: '-')),
             $items,
@@ -62,6 +67,22 @@ class WhatsAppLinkService
             $this->rupiah($order->total),
             ucfirst(str_replace('_', ' ', $order->status)),
         );
+
+        if ($order->is_delivery) {
+            $message .= sprintf(
+                "\n\nAlamat Pengantaran:\n%s\n\nPatokan:\n%s".
+                "\n\nOngkos Kirim: %s\nTotal Sementara: %s".
+                "\n\nCatatan:\n%s",
+                $order->delivery_address,
+                $order->delivery_address_detail ?: '-',
+                $order->delivery_fee_status === 'confirmed'
+                    ? $this->rupiah($order->delivery_fee)
+                    : 'Belum ditentukan',
+                $this->rupiah($order->total),
+                $order->delivery_note
+                    ?: 'Ongkos kirim akan dikonfirmasi oleh kasir melalui WhatsApp.',
+            );
+        }
 
         if (filled($receiptUrl)) {
             $message .= "\n\nLihat nota digital:\n".$receiptUrl;

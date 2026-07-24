@@ -229,6 +229,14 @@ function renderCart() {
 }
 
 export function initCart() {
+    const deliveryToggle = document.getElementById('cartIsDelivery');
+    if (deliveryToggle) {
+        deliveryToggle.checked = sessionStorage.getItem('is_delivery') === '1';
+        deliveryToggle.addEventListener('change', () => {
+            sessionStorage.setItem('is_delivery', deliveryToggle.checked ? '1' : '0');
+        });
+    }
+
     // Validate cart on initialization
     validateCart().then(validatedCart => {
         renderCart();

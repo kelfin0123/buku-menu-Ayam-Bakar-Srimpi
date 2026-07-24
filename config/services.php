@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'bank_transfer' => [
+        'name' => env('BANK_NAME'),
+        'account_number' => env('BANK_ACCOUNT_NUMBER'),
+        'account_holder' => env('BANK_ACCOUNT_HOLDER'),
+    ],
+
 ];

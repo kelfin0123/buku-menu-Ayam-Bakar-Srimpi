@@ -41,5 +41,6 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('activities', [ActivityController::class, 'index']);
         Route::post('activities/{activity}/read', [ActivityController::class, 'markRead']);
+        Route::post('orders/{order}/delivery-fee', [OrderController::class, 'confirmDeliveryFee']);
     });
 });

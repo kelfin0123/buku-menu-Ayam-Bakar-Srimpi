@@ -49,26 +49,30 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $orders->map(function (Order $order) {
-                return [
-                    'id' => $order->id,
-                    'order_code' => $order->order_code,
-                    'customer_name' => $order->customer_name,
-                    'table_number' => $order->table_number,
-                    'total' => (int) $order->total,
-                    'payment_method' => $order->payment_method,
-                    'payment_status' => $order->payment_status,
-                    'status' => $order->status,
-                    'created_at' => $order->created_at?->toISOString(),
-                    'items' => $order->items->map(function ($item) {
-                        return [
-                            'product_name' => $item->product_name,
-                            'qty' => (int) $item->qty,
-                            'subtotal' => (int) $item->subtotal,
-                        ];
-                    })->values(),
-                ];
-            })->values(),
+            'data' => $orders->map(fn (Order $order) => $this->formatOrder($order))->values(),
+        ]);
+    }
+
+    public function confirmDeliveryFee(Request $request, Order $order)
+    {
+        abort_unless($order->is_delivery, 422, 'Pesanan ini bukan pesanan antar.');
+        $validated = $request->validate([
+            'delivery_fee' => 'required|numeric|min:0|max:99999999.99',
+        ]);
+
+        $order->forceFill([
+            'delivery_fee' => $validated['delivery_fee'],
+            'delivery_fee_status' => 'confirmed',
+            'shipping_cost' => $validated['delivery_fee'],
+            'total' => (float) $order->subtotal + (float) $validated['delivery_fee'],
+        ])->save();
+        $order = $order->fresh('items.product');
+        $this->firestoreOrders->sync($order);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ongkos kirim berhasil dikonfirmasi.',
+            'data' => $this->formatOrder($order),
         ]);
     }
 
@@ -234,6 +238,20 @@ class OrderController extends Controller
             'customer_name' => $order->customer_name,
             'customer_phone' => $order->customer_phone,
             'customer_address' => $order->customer_address,
+            'is_delivery' => (bool) $order->is_delivery,
+            'isDelivery' => (bool) $order->is_delivery,
+            'order_type' => $order->order_type,
+            'orderType' => $order->order_type,
+            'delivery_address' => $order->delivery_address,
+            'deliveryAddress' => $order->delivery_address,
+            'delivery_address_detail' => $order->delivery_address_detail,
+            'deliveryAddressDetail' => $order->delivery_address_detail,
+            'delivery_note' => $order->delivery_note,
+            'deliveryNote' => $order->delivery_note,
+            'delivery_fee' => $order->delivery_fee === null ? null : (float) $order->delivery_fee,
+            'deliveryFee' => $order->delivery_fee === null ? null : (float) $order->delivery_fee,
+            'delivery_fee_status' => $order->delivery_fee_status,
+            'deliveryFeeStatus' => $order->delivery_fee_status,
             'table_number' => $order->table_number,
             'total' => (int) $order->total,
             'subtotal' => (int) $order->subtotal,
