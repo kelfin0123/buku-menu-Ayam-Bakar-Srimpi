@@ -53,21 +53,6 @@
                 @endif
             </div>
 
-            @if ($whatsappUrl)
-                <a
-                    class="cart-checkout-btn"
-                    href="{{ $whatsappUrl }}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Kirim Nota ke WhatsApp
-                </a>
-            @else
-                <button class="cart-checkout-btn" type="button" disabled>
-                    Nomor WhatsApp pelanggan belum tersedia
-                </button>
-            @endif
-
             @if (!$order->payment_method && $order->status === \App\Models\Order::STATUS_WAITING_PAYMENT)
                 <div class="payment-method-section">
                     <h2>Pilih Metode Pembayaran</h2>

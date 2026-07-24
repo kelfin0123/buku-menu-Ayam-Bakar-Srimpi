@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class CustomerCheckoutPendingOrderTest extends TestCase
@@ -65,6 +66,7 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         $this->assertNotNull($order->expires_at);
         $this->getJson("/api/orders/code/{$order->order_code}")
             ->assertOk()
+            ->assertJsonPath('data.customer_phone', '6281234567890')
             ->assertJsonPath('data.expires_at', $order->expires_at->toISOString());
         $this->assertDatabaseHas('order_items', [
             'order_id' => $order->id,
@@ -125,6 +127,8 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         $this->get(route('order.show', $order->order_code))
             ->assertOk()
             ->assertDontSee('Ongkir')
+            ->assertDontSee('Kirim Nota ke WhatsApp')
+            ->assertDontSee('Nomor WhatsApp pelanggan belum tersedia')
             ->assertSee('Rp 10.000')
             ->assertSee('Bayar Tunai')
             ->assertSee('Bayar QRIS');
@@ -140,5 +144,67 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         ]);
         $this->getJson('/api/orders/incoming')->assertOk()
             ->assertJsonFragment(['order_code' => $order->order_code]);
+    }
+
+    public function test_customer_website_never_shows_send_receipt_to_whatsapp(): void
+    {
+        $order = Order::create([
+            'order_code' => 'ABS-20260720-NOWA',
+            'customer_name' => 'Rani',
+            'customer_phone' => '628123456789',
+            'table_number' => 'D4',
+            'subtotal' => 20000,
+            'shipping_cost' => 0,
+            'total' => 20000,
+            'payment_status' => Order::PAYMENT_STATUS_PENDING,
+            'status' => Order::STATUS_WAITING_PAYMENT,
+        ]);
+
+        $this->get(route('checkout.index'))
+            ->assertOk()
+            ->assertDontSee('Kirim Nota ke WhatsApp');
+        $this->get(route('order.show', $order->order_code))
+            ->assertOk()
+            ->assertDontSee('Kirim Nota ke WhatsApp')
+            ->assertSee('Pilih Metode Pembayaran');
+
+        $receiptUrl = URL::temporarySignedRoute(
+            'receipt.show',
+            now()->addMinute(),
+            ['orderCode' => $order->order_code],
+        );
+        $this->get($receiptUrl)
+            ->assertOk()
+            ->assertDontSee('Kirim Nota ke WhatsApp');
+    }
+
+    public function test_customer_can_choose_qris_without_whatsapp_receipt_button(): void
+    {
+        $order = Order::create([
+            'order_code' => 'ABS-20260720-QRIS',
+            'customer_name' => 'Rani',
+            'customer_phone' => '628123456789',
+            'table_number' => 'D4',
+            'subtotal' => 20000,
+            'shipping_cost' => 0,
+            'total' => 20000,
+            'payment_status' => Order::PAYMENT_STATUS_PENDING,
+            'status' => Order::STATUS_WAITING_PAYMENT,
+        ]);
+
+        $this->post(route('checkout.payment.select', $order->order_code), [
+            'payment_method' => Order::PAYMENT_METHOD_QRIS,
+        ])->assertRedirect(route('checkout.payment', $order->order_code));
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'customer_phone' => '628123456789',
+            'payment_method' => Order::PAYMENT_METHOD_QRIS,
+            'payment_status' => Order::PAYMENT_STATUS_PENDING,
+            'status' => Order::STATUS_WAITING_PAYMENT,
+        ]);
+        $this->get(route('checkout.payment', $order->order_code))
+            ->assertOk()
+            ->assertDontSee('Kirim Nota ke WhatsApp');
     }
 }

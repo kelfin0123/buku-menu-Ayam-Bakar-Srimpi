@@ -36,21 +36,6 @@
             <p class="order-status order-status-{{ $order->status }}">
                 {{ ucfirst(str_replace('_', ' ', $order->status)) }}
             </p>
-
-            @if ($whatsappUrl)
-                <a
-                    class="cart-checkout-btn"
-                    href="{{ $whatsappUrl }}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Kirim Nota ke WhatsApp
-                </a>
-            @else
-                <button class="cart-checkout-btn" type="button" disabled>
-                    Nomor WhatsApp pelanggan belum tersedia
-                </button>
-            @endif
         </article>
     </section>
 @endsection
