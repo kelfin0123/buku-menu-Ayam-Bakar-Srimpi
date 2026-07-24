@@ -25,3 +25,6 @@ Thumbs.db
 kasir-40363-firebase-adminsdk-fbsvc-644243ab18.json
 kasir-40363-*.json
 *-firebase-adminsdk-*.json
+firebase-debug.log
+firestore-debug.log
+lib.zip

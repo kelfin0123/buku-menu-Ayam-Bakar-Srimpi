@@ -101,6 +101,25 @@ class FirestoreOrderService
             $completedAt = $order->finished_at ?? now();
             $employeeUid = (string) ($actor['employee_uid'] ?? '');
             $employeeName = (string) ($actor['employee_name'] ?? 'Employee');
+            $items = $order->items->map(function ($item) {
+                $costPrice = (int) ($item->product?->cost_price ?? 0);
+
+                return [
+                    'productId' => $item->product?->firestore_id ?? (string) $item->product_id,
+                    'productName' => $item->product_name,
+                    'name' => $item->product_name,
+                    'price' => (int) $item->price,
+                    'quantity' => (int) $item->qty,
+                    'subtotal' => (int) $item->subtotal,
+                    'costPrice' => $costPrice,
+                    'costPriceSnapshot' => $costPrice,
+                    'category' => $item->product?->category_id,
+                ];
+            })->values();
+            $totalHpp = (int) $items->sum(
+                fn (array $item) => $item['costPriceSnapshot'] * $item['quantity'],
+            );
+            $grossProfit = (int) $order->total - $totalHpp;
 
             $transaction = [
                 'orderId' => (string) $order->id,
@@ -138,19 +157,10 @@ class FirestoreOrderService
                 'shippingCost' => (int) $order->shipping_cost,
                 'grandTotal' => (int) $order->total,
                 'amount' => (int) $order->total,
-                'totalHPP' => 0,
-                'grossProfit' => (int) $order->total,
-                'netProfit' => (int) $order->total,
-                'items' => $order->items->map(fn ($item) => [
-                    'productId' => $item->product?->firestore_id ?? (string) $item->product_id,
-                    'productName' => $item->product_name,
-                    'name' => $item->product_name,
-                    'price' => (int) $item->price,
-                    'quantity' => (int) $item->qty,
-                    'subtotal' => (int) $item->subtotal,
-                    'costPrice' => 0,
-                    'category' => $item->product?->category_id,
-                ])->values()->all(),
+                'totalHPP' => $totalHpp,
+                'grossProfit' => $grossProfit,
+                'netProfit' => $grossProfit,
+                'items' => $items->all(),
                 'createdAt' => $completedAt,
                 'completedAt' => $completedAt,
                 'updatedAt' => now(),
