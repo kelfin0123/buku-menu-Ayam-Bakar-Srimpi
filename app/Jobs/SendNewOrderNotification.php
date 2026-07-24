@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Order;
 use App\Services\FirebaseMessagingService;
+use App\Services\NewOrderNotificationPolicy;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -25,16 +26,15 @@ class SendNewOrderNotification implements ShouldQueue
         $this->notificationId = (string) Str::uuid();
     }
 
-    public function handle(FirebaseMessagingService $messaging): void
-    {
-        $order = DB::transaction(function (): ?Order {
+    public function handle(
+        FirebaseMessagingService $messaging,
+        NewOrderNotificationPolicy $policy,
+    ): void {
+        $order = DB::transaction(function () use ($policy): ?Order {
             $order = Order::query()->lockForUpdate()->find($this->orderId);
             if (! $order ||
                 $order->new_order_notification_sent_at ||
-                ! in_array($order->status, [
-                    Order::STATUS_WAITING_PAYMENT,
-                    Order::STATUS_NEW_ORDER,
-                ], true)) {
+                ! $policy->isEligible($order)) {
                 return null;
             }
             if ($order->new_order_notification_id &&

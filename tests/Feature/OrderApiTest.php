@@ -50,7 +50,7 @@ class OrderApiTest extends TestCase
         $this->assertDatabaseHas('orders', [
             'customer_name' => 'Customer API',
             'customer_phone' => '',
-            'status' => Order::STATUS_WAITING_PAYMENT,
+            'status' => Order::STATUS_NEW_ORDER,
         ]);
     }
 
@@ -60,8 +60,7 @@ class OrderApiTest extends TestCase
             $mock->shouldReceive('sync')->times(2)->andReturnTrue();
             $mock->shouldReceive('syncCompletion')
                 ->once()
-                ->withArgs(fn (Order $order, array $actor) =>
-                    $order->status === Order::STATUS_COMPLETED
+                ->withArgs(fn (Order $order, array $actor) => $order->status === Order::STATUS_COMPLETED
                     && $actor['employee_uid'] === 'firebase-employee-7')
                 ->andReturnTrue();
         });

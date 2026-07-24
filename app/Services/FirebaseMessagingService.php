@@ -89,6 +89,9 @@ class FirebaseMessagingService
                 'order_type' => (string) ($order->order_type ?: 'pickup'),
                 'customer_name' => $customer,
                 'total' => (string) ((int) $order->total),
+                'payment_method' => (string) $order->payment_method,
+                'payment_status' => (string) $order->payment_status,
+                'order_status' => (string) $order->status,
                 'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
             ],
             'android' => [

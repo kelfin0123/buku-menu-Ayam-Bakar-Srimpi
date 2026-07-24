@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\SendNewOrderNotification;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\FirestoreOrderService;
+use App\Services\NewOrderNotificationDispatcher;
 use App\Services\PromotionService;
 use App\Services\WhatsAppLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
@@ -20,6 +19,7 @@ class CheckoutController extends Controller
         private readonly FirestoreOrderService $firestoreOrders,
         private readonly WhatsAppLinkService $whatsApp,
         private readonly PromotionService $promotions,
+        private readonly NewOrderNotificationDispatcher $notifications,
     ) {}
 
     /**
@@ -108,8 +108,12 @@ class CheckoutController extends Controller
                 'delivery_fee_status' => $isDelivery ? 'pending' : null,
                 'total' => $subtotal,
                 'payment_status' => Order::PAYMENT_STATUS_PENDING,
-                'status' => Order::STATUS_WAITING_PAYMENT,
-                'expires_at' => now()->addMinutes(5), // 5 minutes expiration
+                'status' => $validated['payment_method'] === Order::PAYMENT_METHOD_CASH
+                    ? Order::STATUS_NEW_ORDER
+                    : Order::STATUS_WAITING_PAYMENT,
+                'expires_at' => now()->addMinutes(
+                    $validated['payment_method'] === Order::PAYMENT_METHOD_CASH ? 60 : 5
+                ),
             ]);
 
             // Create order items
@@ -120,14 +124,7 @@ class CheckoutController extends Controller
             \DB::commit();
 
             $this->firestoreOrders->sync($order->fresh('items.product'));
-            try {
-                SendNewOrderNotification::dispatch($order->id)->afterCommit();
-            } catch (\Throwable $exception) {
-                Log::warning('New order notification could not be queued', [
-                    'order_id' => $order->id,
-                    'exception' => get_class($exception),
-                ]);
-            }
+            $this->notifications->dispatchIfEligible($order);
 
             return response()->json([
                 'success' => true,

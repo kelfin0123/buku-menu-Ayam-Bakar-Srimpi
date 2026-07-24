@@ -9,8 +9,11 @@ use App\Models\DeviceToken;
 use App\Models\Order;
 use App\Services\FirebaseMessagingService;
 use App\Services\FirestoreOrderService;
+use App\Services\NewOrderNotificationDispatcher;
+use App\Services\NewOrderNotificationPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
@@ -69,6 +72,8 @@ class NewOrderNotificationTest extends TestCase
         $this->assertSame('Pesanan Baru Masuk 🔔', $payload['notification']['title']);
         $this->assertSame('new_order', $payload['data']['type']);
         $this->assertSame((string) $order->id, $payload['data']['order_id']);
+        $this->assertSame('cash', $payload['data']['payment_method']);
+        $this->assertSame('new_order', $payload['data']['order_status']);
         $this->assertSame('new_order_channel_v1', $payload['android']['notification']['channel_id']);
         foreach ($payload['data'] as $value) {
             $this->assertIsString($value);
@@ -82,8 +87,9 @@ class NewOrderNotificationTest extends TestCase
         $messaging->shouldReceive('sendNewOrder')->once()->andReturn(2);
 
         $job = new SendNewOrderNotification($order->id);
-        $job->handle($messaging);
-        $job->handle($messaging);
+        $policy = app(NewOrderNotificationPolicy::class);
+        $job->handle($messaging, $policy);
+        $job->handle($messaging, $policy);
 
         $order->refresh();
         $this->assertNotNull($order->new_order_notification_sent_at);
@@ -92,13 +98,93 @@ class NewOrderNotificationTest extends TestCase
         $this->assertSame([60, 300, 900], $job->backoff);
 
         $cancelled = $this->order(Order::STATUS_CANCELLED, 'WEB-CANCELLED');
-        (new SendNewOrderNotification($cancelled->id))->handle($messaging);
+        (new SendNewOrderNotification($cancelled->id))->handle($messaging, $policy);
         $this->assertNull($cancelled->fresh()->new_order_notification_sent_at);
+    }
+
+    public function test_notification_policy_matches_restaurant_payment_flow(): void
+    {
+        $policy = app(NewOrderNotificationPolicy::class);
+
+        $cashDraft = $this->order(
+            Order::STATUS_WAITING_PAYMENT,
+            'WEB-CASH-DRAFT',
+            Order::PAYMENT_METHOD_CASH,
+        );
+        $cashReady = $this->order(
+            Order::STATUS_NEW_ORDER,
+            'WEB-CASH-READY',
+            Order::PAYMENT_METHOD_CASH,
+        );
+        $qrisPending = $this->order(
+            Order::STATUS_WAITING_PAYMENT,
+            'WEB-QRIS-PENDING',
+            Order::PAYMENT_METHOD_QRIS,
+        );
+        $qrisPaid = $this->order(
+            Order::STATUS_NEW_ORDER,
+            'WEB-QRIS-PAID',
+            Order::PAYMENT_METHOD_QRIS,
+            Order::PAYMENT_STATUS_PAID,
+        );
+        $bankTransfer = $this->order(
+            Order::STATUS_NEW_ORDER,
+            'WEB-BANK',
+            Order::PAYMENT_METHOD_BANK_TRANSFER,
+        );
+
+        $this->assertFalse($policy->isEligible($cashDraft));
+        $this->assertTrue($policy->isEligible($cashReady));
+        $this->assertFalse($policy->isEligible($qrisPending));
+        $this->assertTrue($policy->isEligible($qrisPaid));
+        $this->assertFalse($policy->isEligible($bankTransfer));
+    }
+
+    public function test_dispatcher_only_queues_eligible_orders(): void
+    {
+        Queue::fake();
+        $dispatcher = app(NewOrderNotificationDispatcher::class);
+        $cashDraft = $this->order(
+            Order::STATUS_WAITING_PAYMENT,
+            'WEB-DISPATCH-DRAFT',
+            Order::PAYMENT_METHOD_CASH,
+        );
+        $cashReady = $this->order(
+            Order::STATUS_NEW_ORDER,
+            'WEB-DISPATCH-CASH',
+            Order::PAYMENT_METHOD_CASH,
+        );
+        $qrisPending = $this->order(
+            Order::STATUS_WAITING_PAYMENT,
+            'WEB-DISPATCH-QRIS-PENDING',
+            Order::PAYMENT_METHOD_QRIS,
+        );
+        $qrisPaid = $this->order(
+            Order::STATUS_NEW_ORDER,
+            'WEB-DISPATCH-QRIS-PAID',
+            Order::PAYMENT_METHOD_QRIS,
+            Order::PAYMENT_STATUS_PAID,
+        );
+
+        $this->assertFalse($dispatcher->dispatchIfEligible($cashDraft));
+        $this->assertTrue($dispatcher->dispatchIfEligible($cashReady));
+        $this->assertFalse($dispatcher->dispatchIfEligible($qrisPending));
+        $this->assertTrue($dispatcher->dispatchIfEligible($qrisPaid));
+
+        Queue::assertPushed(
+            SendNewOrderNotification::class,
+            fn (SendNewOrderNotification $job) => $job->orderId === $cashReady->id,
+        );
+        Queue::assertPushed(
+            SendNewOrderNotification::class,
+            fn (SendNewOrderNotification $job) => $job->orderId === $qrisPaid->id,
+        );
+        Queue::assertPushed(SendNewOrderNotification::class, 2);
     }
 
     public function test_mark_seen_does_not_change_order_status(): void
     {
-        $order = $this->order();
+        $order = $this->order(Order::STATUS_WAITING_PAYMENT);
         $firestore = Mockery::mock(FirestoreOrderService::class);
         $firestore->shouldReceive('sync')->once()->andReturnTrue();
         $this->app->instance(FirestoreOrderService::class, $firestore);
@@ -115,8 +201,10 @@ class NewOrderNotificationTest extends TestCase
     }
 
     private function order(
-        string $status = Order::STATUS_WAITING_PAYMENT,
+        string $status = Order::STATUS_NEW_ORDER,
         string $code = 'WEB-00123',
+        string $paymentMethod = Order::PAYMENT_METHOD_CASH,
+        string $paymentStatus = Order::PAYMENT_STATUS_PENDING,
     ): Order {
         return Order::create([
             'order_code' => $code,
@@ -127,7 +215,8 @@ class NewOrderNotificationTest extends TestCase
             'subtotal' => 60000,
             'shipping_cost' => 0,
             'total' => 60000,
-            'payment_status' => Order::PAYMENT_STATUS_PENDING,
+            'payment_method' => $paymentMethod,
+            'payment_status' => $paymentStatus,
             'status' => $status,
         ]);
     }
