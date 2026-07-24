@@ -8,11 +8,12 @@ use Midtrans\Snap;
 
 class MidtransService
 {
-    public function __construct()
+    public function __construct(MidtransConfigService $configService)
     {
-        Config::$serverKey = config('midtrans.server_key');
-        Config::$clientKey = config('midtrans.client_key');
-        Config::$isProduction = config('midtrans.is_production', false);
+        $credentials = $configService->required();
+        Config::$serverKey = $credentials['server_key'];
+        Config::$clientKey = $credentials['client_key'];
+        Config::$isProduction = $credentials['is_production'];
         Config::$isSanitized = config('midtrans.is_sanitized', true);
         Config::$is3ds = config('midtrans.is_3ds', true);
     }
@@ -48,7 +49,7 @@ class MidtransService
 
         try {
             $snapToken = Snap::getSnapToken($payload);
-            
+
             // Update order with Midtrans data
             $order->update([
                 'midtrans_snap_token' => $snapToken,
@@ -57,7 +58,7 @@ class MidtransService
 
             return $snapToken;
         } catch (\Exception $e) {
-            throw new \Exception('Gagal membuat Snap token: ' . $e->getMessage());
+            throw new \Exception('Gagal membuat Snap token: '.$e->getMessage());
         }
     }
 
@@ -75,23 +76,23 @@ class MidtransService
         if ($transactionStatus == 'capture') {
             if ($fraudStatus == 'challenge') {
                 $order->payment_status = Order::PAYMENT_STATUS_PENDING;
-            } else if ($fraudStatus == 'accept') {
+            } elseif ($fraudStatus == 'accept') {
                 $order->payment_status = Order::PAYMENT_STATUS_PAID;
                 $order->status = Order::STATUS_NEW_ORDER;
             }
-        } else if ($transactionStatus == 'settlement') {
+        } elseif ($transactionStatus == 'settlement') {
             $order->payment_status = Order::PAYMENT_STATUS_PAID;
             $order->status = Order::STATUS_NEW_ORDER;
-        } else if ($transactionStatus == 'cancel') {
+        } elseif ($transactionStatus == 'cancel') {
             $order->payment_status = Order::PAYMENT_STATUS_FAILED;
             $order->status = Order::STATUS_CANCELLED;
-        } else if ($transactionStatus == 'deny') {
+        } elseif ($transactionStatus == 'deny') {
             $order->payment_status = Order::PAYMENT_STATUS_FAILED;
             $order->status = Order::STATUS_CANCELLED;
-        } else if ($transactionStatus == 'expire') {
+        } elseif ($transactionStatus == 'expire') {
             $order->payment_status = Order::PAYMENT_STATUS_FAILED;
             $order->status = Order::STATUS_EXPIRED;
-        } else if ($transactionStatus == 'pending') {
+        } elseif ($transactionStatus == 'pending') {
             $order->payment_status = Order::PAYMENT_STATUS_PENDING;
         }
 
@@ -99,5 +100,4 @@ class MidtransService
 
         return $order;
     }
-
 }

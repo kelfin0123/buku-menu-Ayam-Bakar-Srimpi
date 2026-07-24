@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\Owner\MidtransSettingController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProductController;
 use Illuminate\Support\Facades\Route;
@@ -31,11 +32,24 @@ Route::prefix('orders')->group(function () {
 });
 
 Route::prefix('payment')->group(function () {
+    Route::middleware('firebase.auth')->group(function () {
+        Route::post('pos/charge', [PaymentController::class, 'chargePos']);
+        Route::get('pos/{orderId}/status', [PaymentController::class, 'posStatus']);
+    });
     Route::post('{order}/qris', [PaymentController::class, 'generateQris']);
     Route::get('{order}/status', [PaymentController::class, 'checkStatus']);
     Route::post('callback', [PaymentController::class, 'handleCallback']);
     Route::post('{order}/confirm-cash', [PaymentController::class, 'confirmCashPayment']);
 });
+
+Route::prefix('owner/payment-settings/midtrans')
+    ->middleware('firebase.owner')
+    ->group(function () {
+        Route::get('/', [MidtransSettingController::class, 'show']);
+        Route::put('/', [MidtransSettingController::class, 'update']);
+        Route::post('/test', [MidtransSettingController::class, 'test']);
+        Route::delete('/', [MidtransSettingController::class, 'destroy']);
+    });
 
 Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum'])->group(function () {

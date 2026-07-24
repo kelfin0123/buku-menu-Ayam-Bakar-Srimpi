@@ -4,22 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Services\MidtransService;
 use App\Services\FirestoreOrderService;
-use Illuminate\Http\Request;
+use App\Services\MidtransPaymentService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
-    private MidtransService $midtransService;
-
     public function __construct(
-        MidtransService $midtransService,
+        private readonly MidtransPaymentService $midtransPaymentService,
         private readonly FirestoreOrderService $firestoreOrders,
-    )
-    {
-        $this->midtransService = $midtransService;
-    }
+    ) {}
 
     /**
      * Generate QRIS payment for an order
@@ -35,6 +30,7 @@ class PaymentController extends Controller
 
         if ($order->isExpired()) {
             $order->markAsExpired();
+
             return response()->json([
                 'success' => false,
                 'message' => 'Pesanan telah kadaluarsa',
@@ -42,7 +38,7 @@ class PaymentController extends Controller
         }
 
         try {
-            $snapToken = $this->midtransService->createSnapToken($order);
+            $snapToken = $this->midtransPaymentService->createSnapToken($order);
 
             return response()->json([
                 'success' => true,
@@ -53,11 +49,10 @@ class PaymentController extends Controller
                     'expires_at' => $order->expires_at?->toISOString(),
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membuat pembayaran QRIS',
-                'error' => $e->getMessage(),
+                'message' => 'Pembayaran tidak dapat diproses. Midtrans belum dikonfigurasi atau kredensial tidak valid.',
             ], 500);
         }
     }
@@ -83,6 +78,52 @@ class PaymentController extends Controller
         ]);
     }
 
+    public function chargePos(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'payment_type' => ['required', 'in:qris,gopay,ovo'],
+            'order_id' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'amount' => ['required', 'integer', 'min:1', 'max:999999999'],
+            'phone_number' => ['nullable', 'required_if:payment_type,ovo', 'string', 'max:20'],
+        ]);
+
+        try {
+            $data = $this->midtransPaymentService->chargePos(
+                $validated['payment_type'],
+                $validated['order_id'],
+                $validated['amount'],
+                $validated['phone_number'] ?? null,
+            );
+
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Throwable) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pembayaran tidak dapat diproses. Periksa konfigurasi Midtrans.',
+            ], 502);
+        }
+    }
+
+    public function posStatus(string $orderId): JsonResponse
+    {
+        abort_unless(preg_match('/^[A-Za-z0-9._-]+$/', $orderId) === 1, 422);
+
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'transaction_status' => $this->midtransPaymentService
+                        ->posTransactionStatus($orderId),
+                ],
+            ]);
+        } catch (\Throwable) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status pembayaran tidak dapat diperiksa.',
+            ], 502);
+        }
+    }
+
     /**
      * Handle Midtrans callback notification
      */
@@ -90,7 +131,7 @@ class PaymentController extends Controller
     {
         try {
             $notification = $request->all();
-            $order = $this->midtransService->handleNotification($notification);
+            $order = $this->midtransPaymentService->handleNotification($notification);
             $this->firestoreOrders->sync($order->fresh('items.product'));
 
             return response()->json([
@@ -102,11 +143,10 @@ class PaymentController extends Controller
                     'order_status' => $order->status,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memproses notifikasi',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
