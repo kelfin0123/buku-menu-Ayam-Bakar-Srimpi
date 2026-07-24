@@ -230,6 +230,21 @@ class OrderController extends Controller
         ]);
     }
 
+    public function markSeen(Request $request, Order $order)
+    {
+        $order->forceFill([
+            'is_seen' => true,
+            'seen_at' => $order->seen_at ?? now(),
+            'seen_by' => $request->attributes->get('firebase_uid'),
+        ])->save();
+        $this->firestoreOrders->sync($order->fresh('items.product'));
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->formatOrder($order),
+        ]);
+    }
+
     private function formatOrder(Order $order): array
     {
         return [
@@ -266,6 +281,9 @@ class OrderController extends Controller
             'rejection_reason' => $order->rejection_reason,
             'expires_at' => $order->expires_at?->toISOString(),
             'created_at' => $order->created_at?->toISOString(),
+            'is_seen' => (bool) $order->is_seen,
+            'seen_at' => $order->seen_at?->toISOString(),
+            'seen_by' => $order->seen_by,
             'items' => $order->items->map(function ($item) {
                 return [
                     'product_name' => $item->product_name,

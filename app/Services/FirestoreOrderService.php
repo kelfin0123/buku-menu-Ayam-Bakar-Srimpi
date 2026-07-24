@@ -240,6 +240,9 @@ class FirestoreOrderService
             'expiresAt' => $order->expires_at,
             'createdAt' => $order->created_at,
             'updatedAt' => $order->updated_at,
+            'isSeen' => (bool) $order->is_seen,
+            'seenAt' => $order->seen_at,
+            'seenBy' => $order->seen_by,
             'items' => $order->items->map(fn ($item) => [
                 'productId' => $item->product?->firestore_id ?? (string) $item->product_id,
                 'name' => $item->product_name,

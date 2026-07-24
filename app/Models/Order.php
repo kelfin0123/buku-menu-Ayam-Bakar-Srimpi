@@ -38,6 +38,11 @@ class Order extends Model
         'rejected_at',
         'rejection_reason',
         'expires_at',
+        'new_order_notification_sent_at',
+        'new_order_notification_id',
+        'is_seen',
+        'seen_at',
+        'seen_by',
     ];
 
     protected $casts = [
@@ -47,6 +52,9 @@ class Order extends Model
         'finished_at' => 'datetime',
         'rejected_at' => 'datetime',
         'expires_at' => 'datetime',
+        'new_order_notification_sent_at' => 'datetime',
+        'is_seen' => 'boolean',
+        'seen_at' => 'datetime',
     ];
 
     // Order Status Constants

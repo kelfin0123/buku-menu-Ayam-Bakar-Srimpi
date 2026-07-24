@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendNewOrderNotification;
 use App\Models\Order;
 use App\Services\FirestoreOrderService;
 use App\Services\OrderProductResolver;
@@ -10,6 +11,7 @@ use App\Services\PromotionService;
 use App\Services\WhatsAppLinkService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -126,6 +128,14 @@ class CheckoutController extends Controller
             \DB::commit();
 
             $this->firestoreOrders->sync($order->fresh('items.product'));
+            try {
+                SendNewOrderNotification::dispatch($order->id)->afterCommit();
+            } catch (\Throwable $exception) {
+                Log::warning('New order notification could not be queued', [
+                    'order_id' => $order->id,
+                    'exception' => get_class($exception),
+                ]);
+            }
 
             session(['clear_cart' => true]);
 

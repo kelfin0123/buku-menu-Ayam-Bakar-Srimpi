@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\RequireFirebaseOwner;
+use App\Http\Middleware\RequireFirebaseStaff;
 use App\Http\Middleware\RequireFirebaseUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->alias([
             'firebase.auth' => RequireFirebaseUser::class,
+            'firebase.staff' => RequireFirebaseStaff::class,
             'firebase.owner' => RequireFirebaseOwner::class,
         ]);
     })

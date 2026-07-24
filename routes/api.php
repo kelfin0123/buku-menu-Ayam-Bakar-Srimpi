@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\CheckoutController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\Owner\HeroBannerController;
 use App\Http\Controllers\Api\Owner\MidtransSettingController;
@@ -24,6 +25,12 @@ Route::delete('products/{product}', [ProductController::class, 'destroy']);
 Route::post('products/validate', [ProductController::class, 'validateProducts']);
 
 Route::post('checkout', [CheckoutController::class, 'store']);
+
+Route::middleware('firebase.staff')->group(function () {
+    Route::post('device-tokens', [DeviceTokenController::class, 'store']);
+    Route::delete('device-tokens/current', [DeviceTokenController::class, 'destroyCurrent']);
+    Route::patch('orders/{order}/seen', [OrderController::class, 'markSeen']);
+});
 
 Route::prefix('orders')->group(function () {
     Route::get('code/{orderCode}', [OrderController::class, 'showByCode']);
