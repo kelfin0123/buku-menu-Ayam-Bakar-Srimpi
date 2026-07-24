@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -19,14 +20,44 @@ class ProductStorageService
             try {
                 \Artisan::call('storage:link');
             } catch (\Throwable $e) {
-                // ignore, best-effort
+                Log::error('ProductStorageService: failed to create storage:link', [
+                    'message' => $e->getMessage(),
+                ]);
             }
+        }
+    }
+
+    /**
+     * Ensure the disk's target directory exists and is writable before upload.
+     */
+    private function ensureDirectoriesExist(): void
+    {
+        $path = storage_path('app/public/'.$this->directory);
+
+        if (! is_dir($path)) {
+            try {
+                mkdir($path, 0755, true);
+            } catch (\Throwable $e) {
+                Log::error('ProductStorageService: failed to create storage directory', [
+                    'path' => $path,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (! is_dir($path) || ! is_writable($path)) {
+            Log::error('ProductStorageService: storage directory is missing or not writable', [
+                'path' => $path,
+            ]);
+
+            throw new \RuntimeException('Direktori penyimpanan produk tidak tersedia atau tidak dapat ditulis.');
         }
     }
 
     public function store(UploadedFile $file): array
     {
         $this->ensureStorageLink();
+        $this->ensureDirectoriesExist();
 
         $extensionByMime = [
             'image/jpeg' => 'jpg',
@@ -40,7 +71,25 @@ class ProductStorageService
 
         $filename = Str::uuid()->toString().'_'.now()->timestamp.'.'.$ext;
         Storage::disk($this->disk)->makeDirectory($this->directory);
-        $path = $file->storeAs($this->directory, $filename, $this->disk);
+
+        try {
+            $path = $file->storeAs($this->directory, $filename, $this->disk);
+        } catch (\Throwable $e) {
+            Log::error('ProductStorageService: failed to store uploaded file', [
+                'filename' => $filename,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+
+        if ($path === false) {
+            Log::error('ProductStorageService: storeAs returned false', [
+                'filename' => $filename,
+            ]);
+
+            throw new \RuntimeException('Gagal menyimpan gambar produk.');
+        }
 
         return [
             'path' => $path,
