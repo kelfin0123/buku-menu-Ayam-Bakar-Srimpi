@@ -31,6 +31,18 @@
                 <input type="text" name="customer_name" id="customer_name" required placeholder="Masukkan nama Anda" value="{{ old('customer_name') }}">
             </div>
             <div class="checkout-field">
+                <label for="customer_phone">Nomor WhatsApp (Opsional)</label>
+                <input
+                    type="tel"
+                    name="customer_phone"
+                    id="customer_phone"
+                    inputmode="tel"
+                    maxlength="20"
+                    placeholder="Contoh: 081234567890"
+                    value="{{ old('customer_phone') }}"
+                >
+            </div>
+            <div class="checkout-field">
                 <label for="table_number">Nomor Meja</label>
                 <input type="text" name="table_number" id="table_number" required placeholder="Contoh: A1, B2" value="{{ old('table_number') }}">
             </div>

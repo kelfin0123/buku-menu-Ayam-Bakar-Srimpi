@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Services\OrderProductResolver;
 use App\Services\FirestoreOrderService;
+use App\Services\OrderProductResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -35,6 +35,12 @@ class CheckoutController extends Controller
     {
         $validated = $request->validate([
             'customer_name' => 'required|string|max:255',
+            'customer_phone' => [
+                'nullable',
+                'string',
+                'max:20',
+                'regex:/^(?:\+?62|0|8)[0-9\s-]{8,17}$/',
+            ],
             'table_number' => 'required|string|max:50',
             'items' => 'required|array|min:1',
             'items.*.firestore_id' => 'required|string',
@@ -47,7 +53,7 @@ class CheckoutController extends Controller
         foreach ($validated['items'] as $item) {
             $product = $this->productResolver->resolve($item['firestore_id']);
 
-            if (!$product) {
+            if (! $product) {
                 return back()
                     ->withInput()
                     ->withErrors(['items' => "Produk {$item['firestore_id']} tidak ditemukan atau tidak aktif di Firebase."]);
@@ -69,7 +75,7 @@ class CheckoutController extends Controller
             $order = Order::create([
                 'order_code' => Order::generateOrderCode(),
                 'customer_name' => $validated['customer_name'],
-                'customer_phone' => '',
+                'customer_phone' => $validated['customer_phone'] ?? '',
                 'customer_address' => null,
                 'table_number' => $validated['table_number'],
                 'subtotal' => $subtotal,
@@ -144,7 +150,7 @@ class CheckoutController extends Controller
     {
         $order = Order::where('order_code', $orderCode)->first();
 
-        if (!$order) {
+        if (! $order) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pesanan tidak ditemukan',
@@ -169,7 +175,7 @@ class CheckoutController extends Controller
     {
         $order = Order::where('order_code', $orderCode)->first();
 
-        if (!$order) {
+        if (! $order) {
             return back()->withErrors(['error' => 'Pesanan tidak ditemukan']);
         }
 
@@ -190,6 +196,7 @@ class CheckoutController extends Controller
 
         } catch (\Exception $e) {
             \DB::rollBack();
+
             return back()->withErrors(['error' => 'Terjadi kesalahan saat membatalkan pesanan.']);
         }
     }

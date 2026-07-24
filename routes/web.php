@@ -84,6 +84,10 @@ Route::prefix('order')->name('order.')->group(function () {
 
 });
 
+Route::get('/receipt/{orderCode}', [OrderController::class, 'receipt'])
+    ->middleware('signed')
+    ->name('receipt.show');
+
 // ===============================
 // API PRODUK (UNTUK MOBILE)
 // ===============================

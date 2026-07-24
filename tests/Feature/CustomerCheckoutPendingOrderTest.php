@@ -39,6 +39,7 @@ class CustomerCheckoutPendingOrderTest extends TestCase
 
         $response = $this->post(route('checkout.store'), [
             'customer_name' => 'Budi',
+            'customer_phone' => '0812-3456-7890',
             'table_number' => 'A1',
             'items' => [
                 [
@@ -51,6 +52,7 @@ class CustomerCheckoutPendingOrderTest extends TestCase
         $response->assertRedirect(route('order.show', Order::where('customer_name', 'Budi')->firstOrFail()->order_code));
         $this->assertDatabaseHas('orders', [
             'customer_name' => 'Budi',
+            'customer_phone' => '0812-3456-7890',
             'table_number' => 'A1',
             'subtotal' => 30000,
             'shipping_cost' => 0,
