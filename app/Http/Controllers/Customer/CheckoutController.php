@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\FirestoreOrderService;
 use App\Services\OrderProductResolver;
+use App\Services\PromotionService;
 use App\Services\WhatsAppLinkService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class CheckoutController extends Controller
         private readonly OrderProductResolver $productResolver,
         private readonly FirestoreOrderService $firestoreOrders,
         private readonly WhatsAppLinkService $whatsApp,
+        private readonly PromotionService $promotions,
     ) {}
 
     /**
@@ -80,13 +82,14 @@ class CheckoutController extends Controller
                     ->withInput()
                     ->withErrors(['items' => "Produk {$item['firestore_id']} tidak ditemukan atau tidak aktif di Firebase."]);
             }
-            $lineTotal = $product->final_price * $item['qty'];
+            $unitPrice = $this->promotions->validatePromotionAtCheckout($product);
+            $lineTotal = $unitPrice * $item['qty'];
             $subtotal += $lineTotal;
 
             $itemsData[] = [
                 'product_id' => $product->id,
                 'product_name' => $product->name,
-                'price' => $product->final_price,
+                'price' => $unitPrice,
                 'qty' => $item['qty'],
                 'subtotal' => $lineTotal,
             ];

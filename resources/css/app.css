@@ -389,6 +389,9 @@ body {
 .hero-title span { display: block; color: var(--color-accent); font-size: 2.4rem; font-weight: 700; }
 
 .hero-desc { font-size: .92rem; color: #cbcbe0; line-height: 1.5; margin-bottom: 1.4rem; }
+.hero-subtitle { font-size: 1rem; color: #fff; line-height: 1.45; margin: .5rem 0; }
+.product-promo-badge { display: inline-flex; width: fit-content; padding: .2rem .5rem; border-radius: .5rem; background: #ef4444; color: #fff; font-size: .68rem; font-weight: 800; }
+.product-card-price del { color: var(--color-text-muted); font-size: .76rem; font-weight: 500; margin-right: .35rem; }
 
 .hero-btn {
     display: inline-flex;

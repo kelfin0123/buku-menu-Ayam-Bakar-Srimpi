@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Customer;
 
 use App\Http\Controllers\Controller;
+use App\Models\HeroBanner;
 use App\Models\Product;
+use App\Models\Promotion;
+use App\Services\PromotionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -14,6 +17,8 @@ use Illuminate\View\View;
 
 class MenuController extends Controller
 {
+    public function __construct(private readonly PromotionService $promotionService) {}
+
     public function index(Request $request): View
     {
         [$products, $error] = $this->loadProducts();
@@ -30,6 +35,10 @@ class MenuController extends Controller
             'firestoreError' => $error,
             'activeCategory' => $request->string('category', 'semua')->toString(),
             'searchTerm' => $request->string('search')->toString(),
+            'heroBanners' => HeroBanner::query()->currentlyActive()
+                ->orderBy('sort_order')->orderByDesc('id')->get(),
+            'promotions' => Promotion::query()->with('product')->currentlyActive()
+                ->orderBy('sort_order')->orderByDesc('id')->get(),
         ]);
     }
 
@@ -87,6 +96,36 @@ class MenuController extends Controller
     {
         $category = $request->string('category')->toString();
         $search = Str::lower($request->string('search')->toString());
+
+        if ($category === 'promo') {
+            return Promotion::query()
+                ->with('product')
+                ->currentlyActive()
+                ->orderBy('sort_order')
+                ->orderByDesc('id')
+                ->get()
+                ->filter(fn (Promotion $promotion) => $promotion->product?->is_active)
+                ->map(function (Promotion $promotion): array {
+                    $product = $promotion->product;
+
+                    return [
+                        'id' => (string) ($product->firestore_id ?: $product->id),
+                        'name' => $product->name,
+                        'description' => $promotion->description ?: $product->description,
+                        'category' => 'Promo',
+                        'price' => $this->promotionService->calculatePromoPrice($promotion, $product),
+                        'normalPrice' => (int) $product->price,
+                        'stock' => (int) $product->stock,
+                        'imageUrl' => $promotion->image_url ?: $product->image_url,
+                        'badge' => $promotion->badge_text ?: 'PROMO',
+                        'isActive' => true,
+                    ];
+                })
+                ->when($search !== '', fn (Collection $items) => $items->filter(
+                    fn (array $product) => str_contains(Str::lower($product['name']), $search),
+                ))
+                ->values();
+        }
 
         return $products
             ->when($category !== '' && $category !== 'semua', fn (Collection $items) => $items->filter(fn (array $product) => Str::slug($product['category']) === $category)

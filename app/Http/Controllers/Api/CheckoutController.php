@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\FirestoreOrderService;
+use App\Services\PromotionService;
 use App\Services\WhatsAppLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class CheckoutController extends Controller
     public function __construct(
         private readonly FirestoreOrderService $firestoreOrders,
         private readonly WhatsAppLinkService $whatsApp,
+        private readonly PromotionService $promotions,
     ) {}
 
     /**
@@ -68,13 +70,14 @@ class CheckoutController extends Controller
 
         foreach ($validated['items'] as $item) {
             $product = Product::where('firestore_id', $item['product_id'])->firstOrFail();
-            $lineTotal = $product->final_price * $item['qty'];
+            $unitPrice = $this->promotions->validatePromotionAtCheckout($product);
+            $lineTotal = $unitPrice * $item['qty'];
             $subtotal += $lineTotal;
 
             $itemsData[] = [
                 'product_id' => $product->id,
                 'product_name' => $product->name,
-                'price' => $product->final_price,
+                'price' => $unitPrice,
                 'qty' => $item['qty'],
                 'subtotal' => $lineTotal,
             ];

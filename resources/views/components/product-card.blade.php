@@ -14,8 +14,14 @@
 
         <div class="product-card-footer">
             <div>
-                <span class="product-card-price">
-                    Rp {{ number_format($product['price'], 0, ',', '.') }}
+            @if (!empty($product['badge']))
+                <span class="product-promo-badge">{{ $product['badge'] }}</span>
+            @endif
+            <span class="product-card-price">
+                @if (!empty($product['normalPrice']) && $product['normalPrice'] > $product['price'])
+                    <del>Rp {{ number_format($product['normalPrice'], 0, ',', '.') }}</del>
+                @endif
+                Rp {{ number_format($product['price'], 0, ',', '.') }}
                 </span>
                 <div class="product-card-stock">Stok: {{ $product['stock'] }}</div>
             </div>

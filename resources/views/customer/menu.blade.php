@@ -27,7 +27,7 @@
     </header>
 
     {{-- Hero Slider --}}
-    <x-hero />
+    <x-hero :slides="$heroBanners" />
 
     {{-- Kategori --}}
     <x-category :categories="$categories" :active="$activeCategory" />

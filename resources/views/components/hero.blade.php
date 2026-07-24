@@ -1,63 +1,71 @@
+@props(['slides' => collect()])
+
 @php
-    // Idealnya data ini berasal dari tabel `banners` via Controller.
-    // Untuk saat ini disediakan default agar komponen tetap reusable.
-    $slides = $slides ?? [
-        [
-            'title_line1' => 'Ayam Bakar',
-            'title_line2' => 'Srimpi',
-            'desc'  => 'Bakar dengan bumbu pilihan, cita rasa khas yang selalu dirindukan.',
-            'image' => asset('images/banner/hero-1.jpg'),
-            'cta'   => route('menu.index'),
-        ],
-        [
-            'title_line1' => 'Paket Hemat',
-            'title_line2' => 'Keluarga',
-            'desc'  => 'Nikmati promo spesial untuk makan bersama keluarga tercinta.',
-            'image' => asset('images/banner/hero-2.jpg'),
-            'cta'   => route('menu.index', ['category' => 'paket-hemat']),
-        ],
-        [
-            'title_line1' => 'Minuman Segar',
-            'title_line2' => 'Setiap Hari',
-            'desc'  => 'Pelepas dahaga dengan pilihan minuman favorit pelanggan.',
-            'image' => asset('images/banner/hero-3.jpg'),
-            'cta'   => route('menu.index', ['category' => 'minuman']),
-        ],
-    ];
+    $fallback = collect([[
+        'title' => 'Selamat Datang',
+        'highlight_text' => '',
+        'subtitle' => 'Temukan menu favorit Anda.',
+        'description' => null,
+        'button_text' => 'Lihat Menu',
+        'button_url' => '#menu',
+        'resolved_image_url' => null,
+    ]]);
+    $items = $slides->isNotEmpty() ? $slides : $fallback;
 @endphp
 
 <section class="hero-slider" id="heroSlider" data-autoplay="5000">
     <div class="hero-track">
-        @foreach ($slides as $i => $slide)
+        @foreach ($items as $i => $slide)
+            @php
+                $value = is_array($slide) ? $slide : $slide->toArray();
+                $image = is_array($slide)
+                    ? ($value['resolved_image_url'] ?? null)
+                    : $slide->resolved_image_url;
+            @endphp
             <div class="hero-slide {{ $i === 0 ? 'is-active' : '' }}" data-index="{{ $i }}">
                 <div class="hero-content">
                     <h1 class="hero-title">
-                        {{ $slide['title_line1'] }}
-                        <span>{{ $slide['title_line2'] }}</span>
+                        {{ $value['title'] }}
+                        @if (!empty($value['highlight_text']))
+                            <span>{{ $value['highlight_text'] }}</span>
+                        @endif
                     </h1>
-                    <p class="hero-desc">{{ $slide['desc'] }}</p>
-                    <a href="{{ $slide['cta'] }}" class="hero-btn">
-                        Lihat Menu
-                        <span>@include('components.icons.chevron-right')</span>
-                    </a>
+                    @if (!empty($value['subtitle']))
+                        <p class="hero-subtitle">{{ $value['subtitle'] }}</p>
+                    @endif
+                    @if (!empty($value['description']))
+                        <p class="hero-desc">{{ $value['description'] }}</p>
+                    @endif
+                    @if (!empty($value['button_text']))
+                        <a href="{{ $value['button_url'] ?: '#menu' }}" class="hero-btn">
+                            {{ $value['button_text'] }}
+                            <span>@include('components.icons.chevron-right')</span>
+                        </a>
+                    @endif
                 </div>
-                <div class="hero-image-wrap">
-                    <img src="{{ $slide['image'] }}" alt="{{ $slide['title_line1'] }}" class="hero-image" onerror="this.src='https://images.unsplash.com/photo-1598515213692-5f252f5c2b2f?w=900&q=80'">
-                </div>
+                @if ($image)
+                    <div class="hero-image-wrap">
+                        <img src="{{ $image }}" alt="{{ $value['title'] }}"
+                             class="hero-image" loading="{{ $i === 0 ? 'eager' : 'lazy' }}"
+                             onerror="this.closest('.hero-image-wrap').remove()">
+                    </div>
+                @endif
             </div>
         @endforeach
     </div>
 
-    <button type="button" class="hero-nav hero-nav-prev" id="heroPrev" aria-label="Sebelumnya">
-        @include('components.icons.chevron-left')
-    </button>
-    <button type="button" class="hero-nav hero-nav-next" id="heroNext" aria-label="Berikutnya">
-        @include('components.icons.chevron-right')
-    </button>
-
-    <div class="hero-indicators" id="heroIndicators">
-        @foreach ($slides as $i => $slide)
-            <button type="button" class="hero-dot {{ $i === 0 ? 'is-active' : '' }}" data-index="{{ $i }}" aria-label="Slide {{ $i + 1 }}"></button>
-        @endforeach
-    </div>
+    @if ($items->count() > 1)
+        <button type="button" class="hero-nav hero-nav-prev" id="heroPrev" aria-label="Sebelumnya">
+            @include('components.icons.chevron-left')
+        </button>
+        <button type="button" class="hero-nav hero-nav-next" id="heroNext" aria-label="Berikutnya">
+            @include('components.icons.chevron-right')
+        </button>
+        <div class="hero-indicators" id="heroIndicators">
+            @foreach ($items as $i => $slide)
+                <button type="button" class="hero-dot {{ $i === 0 ? 'is-active' : '' }}"
+                        data-index="{{ $i }}" aria-label="Slide {{ $i + 1 }}"></button>
+            @endforeach
+        </div>
+    @endif
 </section>
