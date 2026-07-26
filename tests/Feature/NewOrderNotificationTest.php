@@ -232,26 +232,6 @@ class NewOrderNotificationTest extends TestCase
         $this->assertTrue($order->is_seen);
         $this->assertSame('employee-seen', $order->seen_by);
         $this->assertSame(Order::STATUS_WAITING_PAYMENT, $order->status);
-    }
-
-    private function order(
-        string $status = Order::STATUS_NEW_ORDER,
-        string $code = 'WEB-00123',
-        string $paymentMethod = Order::PAYMENT_METHOD_CASH,
-        string $paymentStatus = Order::PAYMENT_STATUS_PENDING,
-    ): Order {
-        return Order::create([
-            'order_code' => $code,
-            'customer_name' => 'Salsa',
-            'customer_phone' => '628123456789',
-            'is_delivery' => true,
-            'order_type' => 'delivery',
-            'subtotal' => 60000,
-            'shipping_cost' => 0,
-            'total' => 60000,
-            'payment_method' => $paymentMethod,
-            'payment_status' => $paymentStatus,
-            'status' => $status,
-        ]);
+   
     }
 }
