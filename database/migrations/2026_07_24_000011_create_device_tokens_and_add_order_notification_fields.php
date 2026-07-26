@@ -10,18 +10,20 @@ return new class extends Migration
     {
         Schema::create('device_tokens', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('employee_id')->nullable()->index();
             $table->string('user_id')->nullable()->index();
             $table->unsignedBigInteger('store_id')->nullable()->index();
-            $table->string('token', 512)->unique();
+            $table->string('fcm_token', 512)->unique();
             $table->string('platform', 30)->nullable();
             $table->string('device_name')->nullable();
             $table->string('role', 30)->nullable()->index();
             $table->boolean('is_active')->default(true)->index();
             $table->boolean('sound_enabled')->default(true);
             $table->boolean('vibration_enabled')->default(true);
-            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('last_seen_at')->nullable();
             $table->timestamps();
         });
+
 
         Schema::table('orders', function (Blueprint $table): void {
             $table->timestamp('new_order_notification_sent_at')->nullable()->index();

@@ -30,16 +30,19 @@ class FirebaseMessagingService
                 );
 
             if ($response->successful()) {
-                $device->update(['last_used_at' => now()]);
+                $device->update(['last_seen_at' => now()]);
                 $sent++;
+                
+                \Illuminate\Support\Facades\Log::info('FCM SUCCESS', ['fcm_token' => $device->fcm_token]);
 
                 continue;
             }
 
             if (in_array($response->status(), [400, 404], true)) {
                 $error = (string) $response->json('error.details.0.errorCode');
-                if (in_array($error, ['UNREGISTERED', 'INVALID_ARGUMENT'], true)) {
+                if (in_array($error, ['UNREGISTERED', 'INVALID_ARGUMENT', 'NOT_FOUND'], true)) {
                     $device->update(['is_active' => false]);
+                    \Illuminate\Support\Facades\Log::warning('INVALID TOKEN', ['fcm_token' => $device->fcm_token, 'error' => $error]);
                 }
             }
         }
@@ -56,34 +59,26 @@ class FirebaseMessagingService
             ? "{$order->order_code} • {$customer}\nTotal {$rupiah}\n{$typeLabel}"
             : "Pesanan baru senilai {$rupiah}\n{$typeLabel}";
 
-        $channelId = match ([$device->sound_enabled, $device->vibration_enabled]) {
-            [true, true] => 'new_order_channel_v1',
-            [true, false] => 'new_order_sound_only_channel_v1',
-            [false, true] => 'new_order_vibrate_only_channel_v1',
-            default => 'new_order_silent_channel_v1',
-        };
         $androidNotification = [
-            'channel_id' => $channelId,
+            'channel_id' => 'incoming_orders_v2',
             'notification_priority' => 'PRIORITY_MAX',
             'visibility' => 'PUBLIC',
-            'default_vibrate_timings' => $device->vibration_enabled,
+            'default_vibrate_timings' => true,
+            'sound' => 'default',
         ];
-        if ($device->sound_enabled) {
-            $androidNotification['sound'] = 'new_order';
-        }
         $aps = ['badge' => 1];
         if ($device->sound_enabled) {
             $aps['sound'] = 'new_order.wav';
         }
 
         return [
-            'token' => $device->token,
+            'token' => $device->fcm_token,
             'notification' => [
-                'title' => 'Pesanan Baru Masuk 🔔',
+                'title' => 'Pesanan Baru',
                 'body' => $body,
             ],
             'data' => [
-                'type' => 'new_order',
+                'type' => 'incoming_order',
                 'order_id' => (string) $order->id,
                 'order_code' => (string) $order->order_code,
                 'order_type' => (string) ($order->order_type ?: 'pickup'),
@@ -92,6 +87,7 @@ class FirebaseMessagingService
                 'payment_method' => (string) $order->payment_method,
                 'payment_status' => (string) $order->payment_status,
                 'order_status' => (string) $order->status,
+                'route' => 'incoming_orders',
                 'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
             ],
             'android' => [

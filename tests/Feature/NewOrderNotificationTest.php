@@ -28,7 +28,7 @@ class NewOrderNotificationTest extends TestCase
         ])->assertUnauthorized();
 
         $storeRequest = Request::create('/api/device-tokens', 'POST', [
-            'token' => 'fcm-device-token-1',
+            'fcm_token' => 'fcm-device-token-1',
             'platform' => 'android',
             'device_name' => 'Android Test',
             'sound_enabled' => false,
@@ -41,18 +41,52 @@ class NewOrderNotificationTest extends TestCase
         $this->assertDatabaseHas('device_tokens', [
             'user_id' => 'employee-1',
             'role' => 'employee',
-            'token' => 'fcm-device-token-1',
+            'fcm_token' => 'fcm-device-token-1',
             'is_active' => true,
             'sound_enabled' => false,
         ]);
 
         $deleteRequest = Request::create('/api/device-tokens/current', 'DELETE', [
-            'token' => 'fcm-device-token-1',
+            'fcm_token' => 'fcm-device-token-1',
         ]);
         $deleteRequest->attributes->set('firebase_uid', 'employee-1');
         app(DeviceTokenController::class)->destroyCurrent($deleteRequest);
         $this->assertDatabaseHas('device_tokens', [
-            'token' => 'fcm-device-token-1',
+            'fcm_token' => 'fcm-device-token-1',
+            'is_active' => false,
+        ]);
+    }
+
+    public function test_staff_can_replace_token_with_previous_fcm_token(): void
+    {
+        $existing = DeviceToken::create([
+            'fcm_token' => 'old-fcm-token',
+            'user_id' => 'employee-1',
+            'role' => 'employee',
+            'is_active' => true,
+            'sound_enabled' => true,
+            'vibration_enabled' => true,
+        ]);
+
+        $storeRequest = Request::create('/api/device-tokens', 'POST', [
+            'fcm_token' => 'new-fcm-token',
+            'previous_fcm_token' => 'old-fcm-token',
+            'platform' => 'android',
+            'device_name' => 'Android Test',
+            'sound_enabled' => false,
+            'vibration_enabled' => true,
+        ]);
+        $storeRequest->attributes->set('firebase_uid', 'employee-1');
+        $storeRequest->attributes->set('firebase_role', 'employee');
+        app(DeviceTokenController::class)->store($storeRequest);
+
+        $this->assertDatabaseHas('device_tokens', [
+            'fcm_token' => 'new-fcm-token',
+            'user_id' => 'employee-1',
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('device_tokens', [
+            'fcm_token' => 'old-fcm-token',
             'is_active' => false,
         ]);
     }
@@ -61,7 +95,7 @@ class NewOrderNotificationTest extends TestCase
     {
         $order = $this->order();
         $device = DeviceToken::create([
-            'token' => 'token',
+            'fcm_token' => 'token',
             'role' => 'employee',
             'sound_enabled' => true,
             'vibration_enabled' => true,
@@ -69,12 +103,12 @@ class NewOrderNotificationTest extends TestCase
 
         $payload = app(FirebaseMessagingService::class)->payload($order, $device);
 
-        $this->assertSame('Pesanan Baru Masuk 🔔', $payload['notification']['title']);
-        $this->assertSame('new_order', $payload['data']['type']);
+        $this->assertSame('Pesanan Baru', $payload['notification']['title']);
+        $this->assertSame('incoming_order', $payload['data']['type']);
         $this->assertSame((string) $order->id, $payload['data']['order_id']);
         $this->assertSame('cash', $payload['data']['payment_method']);
         $this->assertSame('new_order', $payload['data']['order_status']);
-        $this->assertSame('new_order_channel_v1', $payload['android']['notification']['channel_id']);
+        $this->assertSame('incoming_orders_v2', $payload['android']['notification']['channel_id']);
         foreach ($payload['data'] as $value) {
             $this->assertIsString($value);
         }
