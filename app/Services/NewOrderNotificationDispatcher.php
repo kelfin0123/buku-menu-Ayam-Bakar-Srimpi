@@ -21,6 +21,11 @@ class NewOrderNotificationDispatcher
             return false;
         }
 
+        Log::info('SEND FCM queued', [
+            'order_id' => $order->id,
+            'order_code' => $order->order_code,
+        ]);
+
         try {
             SendNewOrderNotification::dispatch($order->id)->afterCommit();
 

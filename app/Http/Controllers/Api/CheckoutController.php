@@ -11,6 +11,7 @@ use App\Services\PromotionService;
 use App\Services\WhatsAppLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
@@ -122,6 +123,12 @@ class CheckoutController extends Controller
             }
 
             \DB::commit();
+
+            Log::info('ORDER CREATED', [
+                'order_id' => $order->id,
+                'order_code' => $order->order_code,
+                'payment_method' => $order->payment_method,
+            ]);
 
             $this->firestoreOrders->sync($order->fresh('items.product'));
             $this->notifications->dispatchIfEligible($order);

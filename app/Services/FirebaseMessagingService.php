@@ -21,6 +21,13 @@ class FirebaseMessagingService
         $sent = 0;
 
         foreach ($tokens as $device) {
+            \Illuminate\Support\Facades\Log::info('SEND FCM', [
+                'order_id' => $order->id,
+                'order_code' => $order->order_code,
+                'fcm_token' => $device->fcm_token,
+                'platform' => $device->platform,
+            ]);
+
             $response = Http::acceptJson()
                 ->withToken($accessToken)
                 ->timeout(15)
@@ -28,6 +35,13 @@ class FirebaseMessagingService
                     "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send",
                     ['message' => $this->payload($order, $device)],
                 );
+
+            \Illuminate\Support\Facades\Log::info('FCM RESPONSE', [
+                'order_id' => $order->id,
+                'status' => $response->status(),
+                'ok' => $response->successful(),
+                'body' => $response->body(),
+            ]);
 
             if ($response->successful()) {
                 $device->update(['last_seen_at' => now()]);
